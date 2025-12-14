@@ -9,9 +9,11 @@ import (
 	_ "github.com/lib/pq"
 )
 
-func connectDB() (*sql.DB, error) {
+func ConnectDB() (*sql.DB, error) {
+	envPath := "C:/Users/shaht/Desktop/Test_App/Main_Logic/.env"
+
 	// Загружаем переменные окружения
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load(envPath); err != nil {
 		return nil, fmt.Errorf("ошибка загрузки .env файла: %v", err)
 	}
 
