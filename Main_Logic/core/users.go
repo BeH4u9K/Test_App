@@ -246,3 +246,79 @@ func GetUserData(ID int) ([]byte, error) {
 
 	return jsonData, nil
 }
+
+// возвращает JSON с ролями пользователя
+func GetUserRoles(ID int) ([]byte, error) {
+	db, err := db.ConnectDB()
+	if err != nil {
+		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
+	}
+	defer db.Close()
+
+	query := "SELECT roles FROM users WHERE id = $1"
+	row := db.QueryRow(query, ID)
+
+	var roles []byte
+	err = row.Scan(&roles)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("пользователь с id %d не найден", ID)
+		}
+		return nil, fmt.Errorf("row.Scan: ошибка чтения ролей: %v", err)
+	}
+
+	// Если roles пустой, возвращаем пустой JSON массив
+	if roles == nil || len(roles) == 0 {
+		return []byte("[]"), nil
+	}
+
+	return roles, nil
+}
+
+// Возвращает поле is_blocked из таблицы users
+func IsUserBlocked(ID int) (bool, error) {
+	db, err := db.ConnectDB()
+	if err != nil {
+		return false, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
+	}
+	defer db.Close()
+
+	query := "SELECT is_blocked FROM users WHERE id = $1"
+	row := db.QueryRow(query, ID)
+
+	var isBlocked bool
+	err = row.Scan(&isBlocked)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, fmt.Errorf("пользователь с id %d не найден", ID)
+		}
+		return false, fmt.Errorf("row.Scan: ошибка чтения статуса блокировки: %v", err)
+	}
+
+	return isBlocked, nil
+}
+
+//ф-ция принимает на вход ID пользователя и параметр block (true - заблокировать, false - заблокировать)
+func SetUserBlockStatus(ID int, block bool) error {
+	db, err := db.ConnectDB()
+	if err != nil {
+		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
+	}
+	defer db.Close()
+
+	query := "UPDATE users SET is_blocked = $1 WHERE id = $2"
+	result, err := db.Exec(query, block, ID)
+	if err != nil {
+		return fmt.Errorf("Exec: ошибка при обновлении статуса блокировки: %v", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("RowsAffected: ошибка при проверке обновленных строк: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("пользователь с id %d не найден", ID)
+	}
+	return nil
+}
