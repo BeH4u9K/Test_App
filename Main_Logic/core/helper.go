@@ -8,7 +8,7 @@ import (
 
 func disciplineExists(id int) (bool, error) {
 	var tmp int
-	query := "SELECT 1 FROM discipline WHERE id = $1"
+	query := "SELECT 1 FROM discipline WHERE id = $1 AND is_deleted = FALSE"
 	if err := storage.DB.QueryRow(query, id).Scan(&tmp); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -16,7 +16,6 @@ func disciplineExists(id int) (bool, error) {
 		return false, err
 	}
 	return true, nil
-
 }
 
 func userExists(userID int) (bool, error) {
