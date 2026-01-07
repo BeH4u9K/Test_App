@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vite-react-app
+    ports:
+      - "80:80"
+      - "443:443"  # если добавите SSL позже
+    restart: unless-stopped
+    networks:
+      - app-network
+    # Для разработки можно монтировать volume:
+    # volumes:
+    #   - ./src:/app/src:ro
+    #   - ./public:/app/public:ro
+
+networks:
+  app-network:
+    driver: bridge
