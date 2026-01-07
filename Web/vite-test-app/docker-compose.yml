@@ -1,6 +1,26 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: app-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: >
+      redis-server
+      --appendonly yes
+      --loglevel verbose  # Подробные логи
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   frontend:
     build:
       context: .
@@ -8,15 +28,22 @@ services:
     container_name: vite-react-app
     ports:
       - "80:80"
-      - "443:443"  # если добавите SSL позже
     restart: unless-stopped
+    depends_on:
+      - redis
     networks:
       - app-network
-    # Для разработки можно монтировать volume:
-    # volumes:
-    #   - ./src:/app/src:ro
-    #   - ./public:/app/public:ro
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=development
+    # Для просмотра логов приложения
+    stdin_open: true
+    tty: true
 
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  redis-data:
