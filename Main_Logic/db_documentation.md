@@ -79,6 +79,7 @@ CREATE TABLE question (
     version INT DEFAULT 1,
     is_deleted BOOLEAN DEFAULT FALSE,
     root_id INT,
+    position INT NOT NULL DEFAULT 1;
     FOREIGN KEY (test_id) REFERENCES test(id)
 );
 ```
