@@ -4,8 +4,13 @@ project(AuthorizationServer VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# политика для относительных путей
-cmake_policy(SET CMP0015 NEW)
+if(MINGW)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static-libgcc -static-libstdc++")
+endif()
 
-# подкаталоги
-add_subdirectory(src)
+add_executable(authorization_server src/main.cpp)
+target_include_directories(authorization_server PRIVATE libs)
+
+if(WIN32)
+    target_link_libraries(authorization_server ws2_32 wsock32)
+endif()

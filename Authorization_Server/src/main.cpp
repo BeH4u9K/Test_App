@@ -1,11 +1,8 @@
 #include <iostream>
-#include <cstdlib>
+#include "libs/httplib.h"
 
-int main(int argc, char* argv[]) {
-    std::cout << "Authorization Server starting..." << std::endl;
-    
-    // инициализация конфигурации, логгера, сервера
-    
-    std::cout << "Authorization Server stopped." << std::endl;
-    return EXIT_SUCCESS;
+int main() {
+    std::cout << "Authorization Server base structure" << std::endl;
+    std::cout << "HTTPLib will be integrated in next commits" << std::endl;
+    return 0;
 }
