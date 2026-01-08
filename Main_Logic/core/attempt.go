@@ -39,6 +39,33 @@ func CreateAttempt(userID int, testID int) (int, error) {
 	if err := storage.DB.QueryRow(query, userID, testID, "in_progress").Scan(&attemptID); err != nil {
 		return 0, fmt.Errorf("Scan error: %v", err)
 	}
+
+	// Получаем все вопросы по тесту
+	questionsQuery := "SELECT id FROM question WHERE test_id = $1"
+	rows, err := storage.DB.Query(questionsQuery, testID)
+	if err != nil {
+		return 0, fmt.Errorf("Query questions error: %v", err)
+	}
+	defer rows.Close()
+
+	// Для каждого вопроса создаём ответ с "не выбран" (-1)
+	insertAnswerQuery := `INSERT INTO user_answer (attempt_id, question_id, answer_option_id)
+                          VALUES ($1, $2, $3)`
+	for rows.Next() {
+		var questionID int
+		if err := rows.Scan(&questionID); err != nil {
+			return 0, fmt.Errorf("Scan question_id error: %v", err)
+		}
+
+		if _, err := storage.DB.Exec(insertAnswerQuery, attemptID, questionID, -1); err != nil {
+			return 0, fmt.Errorf("Insert user_answer error: %v", err)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return 0, fmt.Errorf("Rows iteration error: %v", err)
+	}
+
 	return attemptID, nil
 }
 
@@ -246,4 +273,9 @@ func CheckAttempt(userID, testID int) ([]QA, string, error) {
 
 	return answers, status, nil
 
+}
+
+func DeleteAnswer(userID, testID, questionID int) error {
+	// Удаление ответа — это просто установка answer_option_id на -1
+	return UpdateAttemptAnswer(userID, testID, questionID, -1)
 }
