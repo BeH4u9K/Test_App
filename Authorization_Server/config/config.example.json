@@ -1,0 +1,32 @@
+{
+  "server": {
+    "port": 8080,
+    "host": "0.0.0.0"
+  },
+  "mongodb": {
+    "uri": "mongodb://localhost:27017",
+    "database": "auth_db"
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379
+  },
+  "jwt": {
+    "secret_key": "REPLACE_WITH_STRONG_SECRET_KEY",
+    "access_token_expiry_minutes": 1,
+    "refresh_token_expiry_hours": 168
+  },
+  "oauth": {
+    "github": {
+      "client_id": "YOUR_GITHUB_CLIENT_ID",
+      "client_secret": "YOUR_GITHUB_CLIENT_SECRET"
+    },
+    "yandex": {
+      "client_id": "YOUR_YANDEX_CLIENT_ID",
+      "client_secret": "YOUR_YANDEX_CLIENT_SECRET"
+    }
+  },
+  "code_auth": {
+    "expiry_minutes": 1
+  }
+}
