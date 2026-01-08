@@ -29,3 +29,15 @@ func userExists(userID int) (bool, error) {
 	}
 	return true, nil
 }
+
+func hasAttempts(testID int) (bool, error) {
+	query := "SELECT COUNT(*) FROM attempt WHERE test_id = $1"
+
+	var count int
+	err := storage.DB.QueryRow(query, testID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
