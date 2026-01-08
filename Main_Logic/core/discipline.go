@@ -30,19 +30,19 @@ func GetAllDisciplines() ([]Discipline, error) {
 	query := "SELECT id, name, description FROM discipline WHERE is_deleted = FALSE"
 	rows, err := storage.DB.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("Query error: %v", err)
+		return nil, fmt.Errorf("failed to fetch disciplines: %v", err)
 	}
 	defer rows.Close()
 	answer := make([]Discipline, 0)
 	for rows.Next() {
 		var d Discipline
 		if err := rows.Scan(&d.ID, &d.Name, &d.Description); err != nil {
-			return nil, fmt.Errorf("Scan error: %v", err)
+			return nil, fmt.Errorf("scan discipline error: %v", err)
 		}
 		answer = append(answer, d)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows Err: %v", err)
+		return nil, fmt.Errorf("rows error: %v", err)
 	}
 	return answer, nil
 }
@@ -54,9 +54,9 @@ func GetDisciplineByID(id int) (DisciplineDTO, error) {
 	var result DisciplineDTO
 	if err := row.Scan(&result.Name, &result.Description, &result.TeacherID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return DisciplineDTO{}, fmt.Errorf("Discipline with id %d not found or deleted", id)
+			return DisciplineDTO{}, fmt.Errorf("discipline with id %d not found or deleted", id)
 		}
-		return DisciplineDTO{}, fmt.Errorf("Scan error: %v", err)
+		return DisciplineDTO{}, fmt.Errorf("database query error: %v", err)
 	}
 
 	return result, nil
@@ -67,39 +67,48 @@ func ChangeDiscInfoByID(id int, newName string, newDescription string) error {
 	res, err := storage.DB.Exec(query, newName, newDescription, id)
 
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to update discipline: %v", err)
 	}
 
 	rowsAffected, err := res.RowsAffected()
 
 	if err != nil {
-		return fmt.Errorf("RowsAffected error: %v", err)
+		return fmt.Errorf("error checking affected rows: %v", err)
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("Discipline with id %d not found or deleted", id)
+		return fmt.Errorf("discipline with id %d not found or deleted", id)
 	}
 
 	return nil
 }
 
 func GetDisciplineInfo(id int) ([]TestShort, error) {
+	// Проверка на существование дисциплины перед получением тестов
+	exists, err := disciplineExists(id)
+	if err != nil {
+		return nil, fmt.Errorf("validation error: %v", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("discipline with id %d not found or deleted", id)
+	}
+
 	query := "SELECT id, name FROM test WHERE discipline_id = $1 AND is_deleted = FALSE"
 	rows, err := storage.DB.Query(query, id)
 	if err != nil {
-		return nil, fmt.Errorf("Query error: %v", err)
+		return nil, fmt.Errorf("failed to fetch tests: %v", err)
 	}
 	defer rows.Close()
 	result := make([]TestShort, 0)
 	for rows.Next() {
 		var t TestShort
 		if err := rows.Scan(&t.ID, &t.Name); err != nil {
-			return nil, fmt.Errorf("Scan error: %v", err)
+			return nil, fmt.Errorf("scan test error: %v", err)
 		}
 		result = append(result, t)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows Err: %v", err)
+		return nil, fmt.Errorf("rows error: %v", err)
 	}
 	return result, nil
 }
@@ -112,9 +121,9 @@ func CheckTestState(disciplineID, testID int) (bool, error) {
 
 	if err := row.Scan(&isActive); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, fmt.Errorf("Test %d in discipline %d not found or deleted", testID, disciplineID)
+			return false, fmt.Errorf("test %d in discipline %d not found or deleted", testID, disciplineID)
 		}
-		return false, fmt.Errorf("Scan error: %v", err)
+		return false, fmt.Errorf("database error: %v", err)
 	}
 
 	return isActive, nil
@@ -124,25 +133,30 @@ func ChangeTestState(newStatus bool, disciplineID, testID int) error {
 	query := "UPDATE test SET is_active = $1 WHERE id = $2 AND discipline_id = $3 AND is_deleted = FALSE"
 	res, err := storage.DB.Exec(query, newStatus, testID, disciplineID)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to update test state: %v", err)
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("RowsAffected error: %v", err)
+		return fmt.Errorf("error checking affected rows: %v", err)
 	}
 	if rowsAffected == 0 {
-		return fmt.Errorf("Test with id = %d in discipline with id = %d not found or deleted", testID, disciplineID)
+		return fmt.Errorf("test with id %d in discipline %d not found or deleted", testID, disciplineID)
 	}
 	return nil
 }
 
 func AddTest(disciplineID int, name string) (int, error) {
+	exists, _ := disciplineExists(disciplineID)
+	if !exists {
+		return 0, fmt.Errorf("cannot add test: discipline with id %d not found", disciplineID)
+	}
+
 	var id int
 	query := `INSERT INTO test(discipline_id, name, is_active, is_deleted)
 			  VALUES ($1, $2, FALSE, FALSE) 
 			  RETURNING id;`
 	if err := storage.DB.QueryRow(query, disciplineID, name).Scan(&id); err != nil {
-		return 0, fmt.Errorf("Scan error: %v", err)
+		return 0, fmt.Errorf("failed to create test: %v", err)
 	}
 	return id, nil
 }
@@ -151,14 +165,14 @@ func DeleteTest(disciplineID int, testID int) error {
 	query := `UPDATE test SET is_deleted = TRUE WHERE discipline_id = $1 AND id = $2 AND is_deleted = FALSE`
 	res, err := storage.DB.Exec(query, disciplineID, testID)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to delete test: %v", err)
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("RowsAffected error: %v", err)
+		return fmt.Errorf("error checking affected rows: %v", err)
 	}
 	if rowsAffected == 0 {
-		return fmt.Errorf("Test with id %d in discipline with id %d not exists or already deleted", testID, disciplineID)
+		return fmt.Errorf("test with id %d in discipline %d does not exist or already deleted", testID, disciplineID)
 	}
 	return nil
 }
@@ -166,28 +180,28 @@ func DeleteTest(disciplineID int, testID int) error {
 func GetListStudents(disciplineID int) ([]int, error) {
 	existsDiscipline, err := disciplineExists(disciplineID)
 	if err != nil {
-		return nil, fmt.Errorf("disciplineExists error: %v", err)
+		return nil, fmt.Errorf("validation error: %v", err)
 	}
 	if !existsDiscipline {
-		return nil, fmt.Errorf("Discipline not exists or deleted")
+		return nil, fmt.Errorf("discipline with id %d not exists or deleted", disciplineID)
 	}
 
 	result := make([]int, 0)
 	query := `SELECT user_id FROM user_discipline WHERE discipline_id = $1`
 	rows, err := storage.DB.Query(query, disciplineID)
 	if err != nil {
-		return nil, fmt.Errorf("Query error: %v", err)
+		return nil, fmt.Errorf("failed to fetch students: %v", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id int
 		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("Scan error: %v", err)
+			return nil, fmt.Errorf("scan user id error: %v", err)
 		}
 		result = append(result, id)
 	}
 	if rows.Err() != nil {
-		return nil, fmt.Errorf("rows Err: %v", rows.Err())
+		return nil, fmt.Errorf("rows error: %v", rows.Err())
 	}
 	return result, nil
 }
@@ -195,23 +209,30 @@ func GetListStudents(disciplineID int) ([]int, error) {
 func AddUser(userID, disciplineID int) error {
 	existsUser, err := userExists(userID)
 	if err != nil {
-		return fmt.Errorf("userExists error: %v", err)
+		return fmt.Errorf("validation error: %v", err)
 	}
 	if !existsUser {
-		return fmt.Errorf("User with id %d not exists", userID)
+		return fmt.Errorf("user with id %d does not exist", userID)
 	}
 	existsDiscipline, err := disciplineExists(disciplineID)
 	if err != nil {
-		return fmt.Errorf("disciplineExists error: %v", err)
+		return fmt.Errorf("validation error: %v", err)
 	}
 	if !existsDiscipline {
-		return fmt.Errorf("Discipline with id %d not exists or deleted", disciplineID)
+		return fmt.Errorf("discipline with id %d does not exist or deleted", disciplineID)
 	}
-	query := `INSERT INTO user_discipline(user_id, discipline_id)
-              VALUES ($1, $2);`
+
+	var dummy int
+	checkQuery := "SELECT 1 FROM user_discipline WHERE user_id = $1 AND discipline_id = $2"
+	err = storage.DB.QueryRow(checkQuery, userID, disciplineID).Scan(&dummy)
+	if err == nil {
+		return fmt.Errorf("user is already enrolled in this discipline")
+	}
+
+	query := `INSERT INTO user_discipline(user_id, discipline_id) VALUES ($1, $2);`
 	_, err = storage.DB.Exec(query, userID, disciplineID)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to enroll student: %v", err)
 	}
 	return nil
 }
@@ -219,41 +240,49 @@ func AddUser(userID, disciplineID int) error {
 func RemoveUser(userID, disciplineID int) error {
 	existsUser, err := userExists(userID)
 	if err != nil {
-		return fmt.Errorf("userExists error: %v", err)
+		return fmt.Errorf("validation error: %v", err)
 	}
 	if !existsUser {
-		return fmt.Errorf("User with id %d not exists", userID)
+		return fmt.Errorf("user with id %d does not exist", userID)
 	}
 	existsDiscipline, err := disciplineExists(disciplineID)
 	if err != nil {
-		return fmt.Errorf("disciplineExists error: %v", err)
+		return fmt.Errorf("validation error: %v", err)
 	}
 	if !existsDiscipline {
-		return fmt.Errorf("Discipline with id %d not exists or deleted", disciplineID)
+		return fmt.Errorf("discipline with id %d does not exist or deleted", disciplineID)
 	}
 	query := "DELETE FROM user_discipline WHERE user_id = $1 AND discipline_id = $2"
 	res, err := storage.DB.Exec(query, userID, disciplineID)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to remove user: %v", err)
 	}
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("RowsAffected error: %v", err)
+		return fmt.Errorf("error checking affected rows: %v", err)
 	}
 	if rowsAffected == 0 {
-		return fmt.Errorf("Student with id %d is not on discipline with id %d", userID, disciplineID)
+		return fmt.Errorf("student with id %d is not enrolled in discipline %d", userID, disciplineID)
 	}
 	return nil
 }
 
 func CreateDiscipline(name, description string, teacher_id int) (int, error) {
+	exists, err := userExists(teacher_id)
+	if err != nil {
+		return 0, fmt.Errorf("validation error: %v", err)
+	}
+	if !exists {
+		return 0, fmt.Errorf("failed to create discipline: teacher with id %d does not exist", teacher_id)
+	}
+
 	var id int
 	query := `INSERT INTO discipline(teacher_id, name, description)
               VALUES ($1, $2, $3)
               RETURNING id;`
 	row := storage.DB.QueryRow(query, teacher_id, name, description)
 	if err := row.Scan(&id); err != nil {
-		return 0, fmt.Errorf("Scan error: %v", err)
+		return 0, fmt.Errorf("failed to insert discipline: %v", err)
 	}
 	return id, nil
 }
@@ -261,15 +290,15 @@ func CreateDiscipline(name, description string, teacher_id int) (int, error) {
 func DeleteDiscipline(disciplineID int) error {
 	existsDiscipline, err := disciplineExists(disciplineID)
 	if err != nil {
-		return fmt.Errorf("disciplineExists error: %v", err)
+		return fmt.Errorf("validation error: %v", err)
 	}
 	if !existsDiscipline {
-		return fmt.Errorf("Discipline with id %d not exists or deleted", disciplineID)
+		return fmt.Errorf("discipline with id %d does not exist or already deleted", disciplineID)
 	}
 	query := "UPDATE discipline SET is_deleted = TRUE WHERE id = $1"
 	_, err = storage.DB.Exec(query, disciplineID)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to delete discipline: %v", err)
 	}
 	return nil
 }

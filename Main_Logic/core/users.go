@@ -43,19 +43,19 @@ func GetUserData(id int) (UserData, error) {
 		id,
 	)
 	if err != nil {
-		return result, fmt.Errorf("Query error: %v", err)
+		return result, fmt.Errorf("failed to fetch user disciplines: %v", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var discID int
 		if err := rows.Scan(&discID); err != nil {
-			return result, fmt.Errorf("Scan error: %v", err)
+			return result, fmt.Errorf("scan error: %v", err)
 		}
 		userDiscID = append(userDiscID, discID)
 	}
 	if err := rows.Err(); err != nil {
-		return result, fmt.Errorf("rows.Err: %v", err)
+		return result, fmt.Errorf("rows error: %v", err)
 	}
 
 	// 2. Для каждой дисциплины собираем имя и тесты
@@ -64,18 +64,21 @@ func GetUserData(id int) (UserData, error) {
 		d.ID = discID
 
 		if err := storage.DB.QueryRow(
-			"SELECT name FROM discipline WHERE id = $1",
+			"SELECT name FROM discipline WHERE id = $1 AND is_deleted = FALSE",
 			discID,
 		).Scan(&d.Name); err != nil {
-			return result, fmt.Errorf("Query error: %v", err)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return result, fmt.Errorf("failed to fetch discipline name: %v", err)
 		}
 
 		testsRows, err := storage.DB.Query(
-			"SELECT id, name FROM test WHERE discipline_id = $1",
+			"SELECT id, name FROM test WHERE discipline_id = $1 AND is_deleted = FALSE",
 			discID,
 		)
 		if err != nil {
-			return result, fmt.Errorf("Query error: %v", err)
+			return result, fmt.Errorf("failed to fetch tests: %v", err)
 		}
 
 		allTests := make([]UserTest, 0)
@@ -84,7 +87,7 @@ func GetUserData(id int) (UserData, error) {
 			var t UserTest
 			if err := testsRows.Scan(&t.ID, &t.Name); err != nil {
 				testsRows.Close()
-				return result, fmt.Errorf("Scan error: %v", err)
+				return result, fmt.Errorf("scan test error: %v", err)
 			}
 
 			// 3. Подтягиваем балл пользователя, если попытки нет — ставим 0
@@ -98,19 +101,14 @@ func GetUserData(id int) (UserData, error) {
 					t.Score = 0
 				} else {
 					testsRows.Close()
-					return result, fmt.Errorf("Scan error: %v", scoreErr)
+					return result, fmt.Errorf("score fetch error: %v", scoreErr)
 				}
 			}
 
 			allTests = append(allTests, t)
 		}
 
-		if err := testsRows.Err(); err != nil {
-			testsRows.Close()
-			return result, fmt.Errorf("rows.Err: %v", err)
-		}
 		testsRows.Close()
-
 		d.Tests = allTests
 		result.Disciplines = append(result.Disciplines, d)
 	}
@@ -123,7 +121,7 @@ func GetUserRoles(id int) ([]string, error) {
 	query := "SELECT role FROM user_role WHERE user_id = $1"
 	rows, err := storage.DB.Query(query, id)
 	if err != nil {
-		return nil, fmt.Errorf("Query error: %v", err)
+		return nil, fmt.Errorf("failed to fetch roles: %v", err)
 	}
 	result := make([]string, 0)
 	defer rows.Close()
@@ -131,12 +129,12 @@ func GetUserRoles(id int) ([]string, error) {
 	for rows.Next() {
 		var r string
 		if err := rows.Scan(&r); err != nil {
-			return nil, fmt.Errorf("Scan error: %v", err)
+			return nil, fmt.Errorf("scan role error: %v", err)
 		}
 		result = append(result, r)
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err: %v", err)
+		return nil, fmt.Errorf("rows error: %v", err)
 	}
 
 	return result, nil
@@ -147,7 +145,7 @@ func UpdateUserRoles(id int, roles []string) error {
 	// Сначала удаляем все старые роли
 	_, err := storage.DB.Exec("DELETE FROM user_role WHERE user_id = $1", id)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to clear old roles: %v", err)
 	}
 
 	// Затем добавляем новые роли
@@ -157,7 +155,7 @@ func UpdateUserRoles(id int, roles []string) error {
 			id, r,
 		)
 		if err != nil {
-			return fmt.Errorf("Exec error: %v", err)
+			return fmt.Errorf("failed to insert role %s: %v", r, err)
 		}
 	}
 
@@ -171,9 +169,9 @@ func IsUserBlocked(id int) (bool, error) {
 	err := storage.DB.QueryRow(query, id).Scan(&blocked)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return false, fmt.Errorf("User not found: %v", err)
+			return false, fmt.Errorf("user with id %d not found", id)
 		}
-		return false, fmt.Errorf("Scan error: %v", err)
+		return false, fmt.Errorf("database error: %v", err)
 	}
 	return blocked, nil
 }
@@ -183,16 +181,16 @@ func ChangeBlockStatus(id int, blocked bool) error {
 	query := "UPDATE users SET is_blocked = $1 WHERE id = $2"
 	res, err := storage.DB.Exec(query, blocked, id)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("failed to update block status: %v", err)
 	}
 
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("RowsAffected error: %v", err)
+		return fmt.Errorf("rows affected error: %v", err)
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("User not found: %v", fmt.Errorf("user with id %d does not exist", id))
+		return fmt.Errorf("user with id %d does not exist", id)
 	}
 
 	return nil

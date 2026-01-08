@@ -57,20 +57,20 @@ func GetQuestions(testID int) ([]QuestionListItem, error) {
 
 	rows, err := storage.DB.Query(query, testID)
 	if err != nil {
-		return nil, fmt.Errorf("Query error: %v", err)
+		return nil, fmt.Errorf("failed to fetch questions: %v", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var q QuestionListItem
 		if err := rows.Scan(&q.ID, &q.RootID, &q.Title, &q.Version); err != nil {
-			return nil, fmt.Errorf("Scan error: %v", err)
+			return nil, fmt.Errorf("scan error: %v", err)
 		}
 		result = append(result, q)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err: %v", err)
+		return nil, fmt.Errorf("rows error: %v", err)
 	}
 
 	return result, nil
@@ -90,9 +90,9 @@ func GetQuestion(questionID int, version int) (Question, error) {
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return q, fmt.Errorf("Question not found: %v", err)
+			return q, fmt.Errorf("question with id %d not found or deleted", questionID)
 		}
-		return q, fmt.Errorf("Scan error: %v", err)
+		return q, fmt.Errorf("database query error: %v", err)
 	}
 
 	// Получаем все варианты ответов для этого вопроса
@@ -101,20 +101,16 @@ func GetQuestion(questionID int, version int) (Question, error) {
 		questionID,
 	)
 	if err != nil {
-		return q, fmt.Errorf("Query answers error: %v", err)
+		return q, fmt.Errorf("failed to fetch answers: %v", err)
 	}
 	defer answerRows.Close()
 
 	for answerRows.Next() {
 		var a AnswerOption
 		if err := answerRows.Scan(&a.ID, &a.Text, &a.IsCorrect); err != nil {
-			return q, fmt.Errorf("Scan answer error: %v", err)
+			return q, fmt.Errorf("scan answer error: %v", err)
 		}
 		q.Answers = append(q.Answers, a)
-	}
-
-	if err := answerRows.Err(); err != nil {
-		return q, fmt.Errorf("answers rows.Err: %v", err)
 	}
 
 	return q, nil
@@ -123,6 +119,10 @@ func GetQuestion(questionID int, version int) (Question, error) {
 // CreateQuestion создаёт новый вопрос версии 1 с заданными вариантами ответов
 // Возвращает ID созданного вопроса
 func CreateQuestion(testID int, title string, text string, answers []AnswerOption) (int, error) {
+	if len(answers) == 0 {
+		return 0, fmt.Errorf("cannot create question without answer options")
+	}
+
 	var questionID int
 
 	// Вставляем новый вопрос с версией 1, is_deleted = false
@@ -132,7 +132,7 @@ func CreateQuestion(testID int, title string, text string, answers []AnswerOptio
 	).Scan(&questionID)
 
 	if err != nil {
-		return 0, fmt.Errorf("Insert question error: %v", err)
+		return 0, fmt.Errorf("failed to create question: %v", err)
 	}
 
 	// Устанавливаем root_id равным id (это первая версия)
@@ -141,7 +141,7 @@ func CreateQuestion(testID int, title string, text string, answers []AnswerOptio
 		questionID, questionID,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("Update root_id error: %v", err)
+		return 0, fmt.Errorf("failed to set root_id: %v", err)
 	}
 
 	// Вставляем варианты ответов
@@ -151,7 +151,7 @@ func CreateQuestion(testID int, title string, text string, answers []AnswerOptio
 			questionID, ans.Text, ans.IsCorrect,
 		)
 		if err != nil {
-			return 0, fmt.Errorf("Insert answer option error: %v", err)
+			return 0, fmt.Errorf("failed to insert answer option: %v", err)
 		}
 	}
 
@@ -161,6 +161,9 @@ func CreateQuestion(testID int, title string, text string, answers []AnswerOptio
 // UpdateQuestion создаёт новую версию вопроса с новым текстом и вариантами ответов
 // Все версии остаются в БД, новая версия имеет версию = old_max + 1
 func UpdateQuestion(rootID int, newTitle string, newText string, newAnswers []AnswerOption) (int, error) {
+	if len(newAnswers) == 0 {
+		return 0, fmt.Errorf("cannot update question: no answer options provided")
+	}
 
 	// Получаем текущую максимальную версию и test_id по root_id (только не удалённые)
 	var currentVersion int
@@ -171,14 +174,11 @@ func UpdateQuestion(rootID int, newTitle string, newText string, newAnswers []An
 	).Scan(&currentVersion, &testID)
 
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, fmt.Errorf("Question root not found: %v", err)
-		}
-		return 0, fmt.Errorf("Query version error: %v", err)
+		return 0, fmt.Errorf("failed to fetch question root: %v", err)
 	}
 
 	if currentVersion == 0 {
-		return 0, fmt.Errorf("Question root not found: root_id %d does not exist", rootID)
+		return 0, fmt.Errorf("question with root_id %d not found or deleted", rootID)
 	}
 
 	newVersion := currentVersion + 1
@@ -191,7 +191,7 @@ func UpdateQuestion(rootID int, newTitle string, newText string, newAnswers []An
 	).Scan(&newQuestionID)
 
 	if err != nil {
-		return 0, fmt.Errorf("Insert new version error: %v", err)
+		return 0, fmt.Errorf("failed to insert new version: %v", err)
 	}
 
 	// Вставляем варианты ответов для новой версии
@@ -201,7 +201,7 @@ func UpdateQuestion(rootID int, newTitle string, newText string, newAnswers []An
 			newQuestionID, ans.Text, ans.IsCorrect,
 		)
 		if err != nil {
-			return 0, fmt.Errorf("Insert answer option error: %v", err)
+			return 0, fmt.Errorf("failed to insert answer option: %v", err)
 		}
 	}
 
@@ -210,22 +210,31 @@ func UpdateQuestion(rootID int, newTitle string, newText string, newAnswers []An
 
 // DeleteQuestion помечает вопрос как удалённый
 func DeleteQuestion(questionID int) error {
+	var isActive bool
+	query := `SELECT t.is_active FROM test t 
+              JOIN question q ON q.test_id = t.id 
+              WHERE q.id = $1`
+	err := storage.DB.QueryRow(query, questionID).Scan(&isActive)
+	if err == nil && isActive {
+		return fmt.Errorf("cannot delete question belonging to an active test")
+	}
+
 	res, err := storage.DB.Exec(
 		"UPDATE question SET is_deleted = true WHERE id = $1",
 		questionID,
 	)
 
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return fmt.Errorf("database update error: %v", err)
 	}
 
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("RowsAffected error: %v", err)
+		return fmt.Errorf("rows affected error: %v", err)
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("Question not found: %v", fmt.Errorf("question with id %d does not exist", questionID))
+		return fmt.Errorf("question with id %d not found", questionID)
 	}
 
 	return nil
