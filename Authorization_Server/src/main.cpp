@@ -36,6 +36,15 @@ std::string generate_state_token() {
     return ss.str();
 }
 
+// функция для установки CORS заголовков
+void set_cors_headers(Response& res) {
+    res.set_header("Access-Control-Allow-Origin", "http://localhost:5175");
+    res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
+    res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
+    res.set_header("Access-Control-Allow-Credentials", "true");
+    res.set_header("Access-Control-Max-Age", "3600");
+}
+
 int main() {
     if (!load_config()) {
         std::cout << "Config not found, using defaults" << std::endl;
@@ -49,14 +58,29 @@ int main() {
     
     std::cout << "Server starting on " << host << ":" << port << std::endl;
     
+    // обработчик для OPTIONS запросов (preflight CORS)
+    svr.Options(R"(.*)", [](const Request& req, Response& res) {
+        std::cout << "OPTIONS request for CORS preflight" << std::endl;
+        set_cors_headers(res);
+        res.status = 200;
+    });
+    
     // тестовый эндпоинт
     svr.Get("/ping", [](const Request& req, Response& res) {
-        std::cout << "GET /ping - запрос для теста" << std::endl;
+        std::cout << "GET /ping - ping request received" << std::endl;
+
+        // CORS заголовки
+        set_cors_headers(res);
+
         res.set_content("{\"message\": \"Hello World\"}", "application/json");
     });
 
     // эндпоинт /auth - начало авторизации
     svr.Get("/auth", [](const Request& req, Response& res) {
+
+        // CORS заголовки
+        set_cors_headers(res);
+        
         std::string type = req.get_param_value("type");
         std::string login_token = req.get_param_value("state");
         if (type.empty() || login_token.empty()) {
@@ -91,7 +115,7 @@ int main() {
             std::string url = "https://oauth.yandex.ru/authorize?response_type=code&client_id=" + config["yandex"]["client_id"].get<std::string>() +
                 "&redirect_uri=" + config["yandex"]["redirect_uri"].get<std::string>() + "&state=" + state_token;
             response["auth_url"] = url;
-        } else if (type == "code") {
+        } else if (type == "code") {   
 
             // будет генерация кода
 
@@ -108,6 +132,10 @@ int main() {
     
     // проверка статуса
     svr.Get("/check", [](const Request& req, Response& res) {
+
+        // CORS заголовки
+        set_cors_headers(res);
+
         std::string state = req.get_param_value("state");
         std::cout << "GET /check - state: " << state << std::endl;
         res.set_content("{\"message\":\"Check endpoint\"}", "application/json");
@@ -115,6 +143,10 @@ int main() {
     
     // callback от GitHub
     svr.Get("/callback/github", [](const Request& req, Response& res) {
+
+        // CORS заголовки
+        set_cors_headers(res);
+
         std::string code = req.get_param_value("code");
         std::string state = req.get_param_value("state");
         std::string error = req.get_param_value("error");
@@ -127,6 +159,10 @@ int main() {
     
     // callback от Yandex
     svr.Get("/callback/yandex", [](const Request& req, Response& res) {
+
+        // CORS заголовки
+        set_cors_headers(res);
+
         std::string code = req.get_param_value("code");
         std::string state = req.get_param_value("state");
         
@@ -138,12 +174,20 @@ int main() {
     
     // обновление токенов
     svr.Post("/refresh", [](const Request& req, Response& res) {
+
+        // CORS заголовки
+        set_cors_headers(res);
+
         std::cout << "POST /refresh - body: " << req.body << std::endl;
         res.set_content("{\"message\":\"Refresh endpoint\"}", "application/json");
     });
     
     // выход из системы
     svr.Post("/logout", [](const Request& req, Response& res) {
+
+        // CORS заголовки
+        set_cors_headers(res);
+
         std::cout << "POST /logout - body: " << req.body << std::endl;
         res.set_content("{\"message\":\"Logout endpoint\"}", "application/json");
     });
