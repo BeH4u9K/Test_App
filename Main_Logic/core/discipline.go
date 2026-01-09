@@ -48,15 +48,33 @@ func GetAllDisciplines() ([]Discipline, error) {
 }
 
 func GetDisciplineByID(id int) (DisciplineDTO, error) {
-	query := "SELECT name, description, teacher_id FROM discipline WHERE id = $1 AND is_deleted = FALSE"
+	// Сначала ищем запись по ID без учёта флага is_deleted
+	var isDeleted bool
+	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
+	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Если мы здесь, значит строки с таким ID НЕТ ВООБЩЕ.
+			return DisciplineDTO{}, fmt.Errorf("discipline with id %d not found", id)
+		}
+		// Другая ошибка
+		return DisciplineDTO{}, fmt.Errorf("database check error: %v", err)
+	}
+
+	// Запись физически существует. Осталость проверить удалена она или нет
+	if isDeleted {
+		// Запись есть, но она помечена как удаленная.
+		return DisciplineDTO{}, fmt.Errorf("discipline with id %d has been deleted", id)
+	}
+
+	// И только если запись существует И она НЕ удалена, мы запрашиваем все остальные данные.
+	query := "SELECT name, description, teacher_id FROM discipline WHERE id = $1"
 	row := storage.DB.QueryRow(query, id)
 
 	var result DisciplineDTO
-	if err := row.Scan(&result.Name, &result.Description, &result.TeacherID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return DisciplineDTO{}, fmt.Errorf("discipline with id %d not found or deleted", id)
-		}
-		return DisciplineDTO{}, fmt.Errorf("database query error: %v", err)
+	if scanErr := row.Scan(&result.Name, &result.Description, &result.TeacherID); scanErr != nil {
+		return DisciplineDTO{}, fmt.Errorf("database scan error: %v", scanErr)
 	}
 
 	return result, nil
