@@ -1,12 +1,38 @@
 #include <iostream>
+#include <fstream>
 #include "libs/httplib.h"
+#include "libs/json/json.hpp"
+#include "include/session_storage.hpp"
 
+SessionStorage session_storage;
+
+using json = nlohmann::json;
 using namespace httplib;
 
+json config;
+
+bool load_config() {
+    try {
+        std::ifstream config_file("config/config.json");
+        config_file >> config;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 int main() {
+    if (!load_config()) {
+        std::cout << "Config not found, using defaults" << std::endl;
+        config = {{"server", {{"port", 8080}, {"host", "0.0.0.0"}}}};
+    }
+    
+    std::string host = config["server"]["host"];
+    int port = config["server"]["port"];
+    
     Server svr;
     
-    std::cout << "Authorization Server starting..." << std::endl;
+    std::cout << "Server starting on " << host << ":" << port << std::endl;
     
     // начало авторизации
     svr.Get("/auth", [](const Request& req, Response& res) {
@@ -60,6 +86,6 @@ int main() {
         res.set_content("{\"message\":\"Logout endpoint\"}", "application/json");
     });
     
-    svr.listen("0.0.0.0", 8080);
+    svr.listen(host.c_str(), port);
     return 0;
 }
