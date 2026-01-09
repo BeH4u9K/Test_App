@@ -8,7 +8,7 @@ const Test = styled('div')({
 
 function FIcon() {
   return (
-    <Test>Привет Мирвяывыфв</Test>
+    <Test>Привет мир</Test>
   )
 }
 
