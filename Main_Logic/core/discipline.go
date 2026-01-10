@@ -1,452 +1,322 @@
 package core
 
 import (
-	"encoding/json"
+	"database/sql"
+	"errors"
 	"fmt"
-
-	"main_logic/db"
+	"main_logic/storage"
 )
 
-//
-// ===== СТРУКТУРЫ ДАННЫХ =====
-//
-
 type Discipline struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name        string
+	Description string
+	ID          int
 }
 
-type DisciplineInfo struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	TeacherID   int    `json:"teacher_id"`
+// Тоже дисциплина, но уже с ID преподавателя.
+type DisciplineDTO struct {
+	Name        string
+	Description string
+	TeacherID   int
 }
 
-type DisciplineUpdateResult struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	TeacherID   int    `json:"teacher_id"`
-}
-
+// Короткая информация: Название и ID
 type TestShort struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID   int
+	Name string
 }
 
-type StudentRef struct {
-	UserID int `json:"user_id"`
-}
-
-//
-// ===== ФУНКЦИИ РАБОТЫ С ДИСЦИПЛИНАМИ =====
-//
-
-// Получить список дисциплин
-func GetDisciplines() ([]byte, error) {
-	dbConn, err := db.ConnectDB()
+func GetAllDisciplines() ([]Discipline, error) {
+	query := "SELECT id, name, description FROM discipline WHERE is_deleted = FALSE"
+	rows, err := storage.DB.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
-
-	rows, err := dbConn.Query("SELECT id, name, description FROM discipline")
-	if err != nil {
-		return nil, fmt.Errorf("Query: ошибка выполнения запроса: %v", err)
+		return nil, fmt.Errorf("failed to fetch disciplines: %v", err)
 	}
 	defer rows.Close()
-
-	var disciplines []Discipline
-
+	answer := make([]Discipline, 0)
 	for rows.Next() {
 		var d Discipline
 		if err := rows.Scan(&d.ID, &d.Name, &d.Description); err != nil {
-			return nil, fmt.Errorf("rows.Scan: ошибка чтения строки: %v", err)
+			return nil, fmt.Errorf("scan discipline error: %v", err)
 		}
-		disciplines = append(disciplines, d)
+		answer = append(answer, d)
 	}
-
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err: ошибка при обработке результата: %v", err)
+		return nil, fmt.Errorf("rows error: %v", err)
 	}
-
-	jsonData, err := json.Marshal(disciplines)
-	if err != nil {
-		return nil, fmt.Errorf("Marshal: ошибка преобразования в JSON: %v", err)
-	}
-
-	return jsonData, nil
+	return answer, nil
 }
 
-// Получить полную информацию по дисциплине
-func GetDisciplineByID(disciplineID int) ([]byte, error) {
-	dbConn, err := db.ConnectDB()
+func GetDisciplineByID(id int) (DisciplineDTO, error) {
+	// Сначала ищем запись по ID без учёта флага is_deleted
+	var isDeleted bool
+	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
+	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
+
 	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
-
-	row := dbConn.QueryRow(
-		`SELECT id, name, description, teacher_id
-		 FROM discipline
-		 WHERE id = $1`,
-		disciplineID,
-	)
-
-	var d DisciplineInfo
-
-	if err := row.Scan(&d.ID, &d.Name, &d.Description, &d.TeacherID); err != nil {
-		return nil, fmt.Errorf("row.Scan: ошибка чтения результата: %v", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			// Если мы здесь, значит строки с таким ID НЕТ ВООБЩЕ.
+			return DisciplineDTO{}, fmt.Errorf("discipline with id %d not found", id)
+		}
+		// Другая ошибка
+		return DisciplineDTO{}, fmt.Errorf("database check error: %v", err)
 	}
 
-	jsonData, err := json.Marshal(d)
-	if err != nil {
-		return nil, fmt.Errorf("Marshal: ошибка преобразования в JSON: %v", err)
+	// Запись физически существует. Осталость проверить удалена она или нет
+	if isDeleted {
+		// Запись есть, но она помечена как удаленная.
+		return DisciplineDTO{}, fmt.Errorf("discipline with id %d has been deleted", id)
 	}
 
-	return jsonData, nil
+	// И только если запись существует И она НЕ удалена, мы запрашиваем все остальные данные.
+	query := "SELECT name, description, teacher_id FROM discipline WHERE id = $1"
+	row := storage.DB.QueryRow(query, id)
+
+	var result DisciplineDTO
+	if scanErr := row.Scan(&result.Name, &result.Description, &result.TeacherID); scanErr != nil {
+		return DisciplineDTO{}, fmt.Errorf("database scan error: %v", scanErr)
+	}
+
+	return result, nil
 }
 
-// Обновить название / описание дисциплины
-func UpdateDiscipline(disciplineID int, name *string, description *string) ([]byte, error) {
-	dbConn, err := db.ConnectDB()
+func ChangeDiscInfoByID(id int, newName string, newDescription string) error {
+	query := "UPDATE discipline SET name = $1, description = $2 WHERE id = $3 AND is_deleted = FALSE"
+	res, err := storage.DB.Exec(query, newName, newDescription, id)
+
 	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
-
-	row := dbConn.QueryRow(
-		`UPDATE discipline
-		 SET name        = COALESCE($2, name),
-		     description = COALESCE($3, description)
-		 WHERE id = $1
-		 RETURNING id, name, description, teacher_id`,
-		disciplineID,
-		name,
-		description,
-	)
-
-	var d DisciplineUpdateResult
-
-	if err := row.Scan(&d.ID, &d.Name, &d.Description, &d.TeacherID); err != nil {
-		return nil, fmt.Errorf("row.Scan: ошибка чтения результата: %v", err)
+		return fmt.Errorf("failed to update discipline: %v", err)
 	}
 
-	jsonData, err := json.Marshal(d)
+	rowsAffected, err := res.RowsAffected()
+
 	if err != nil {
-		return nil, fmt.Errorf("Marshal: ошибка преобразования в JSON: %v", err)
+		return fmt.Errorf("error checking affected rows: %v", err)
 	}
 
-	return jsonData, nil
+	if rowsAffected == 0 {
+		return fmt.Errorf("discipline with id %d not found or deleted", id)
+	}
+
+	return nil
 }
 
-//
-// ===== Список тестов дисциплины =====
-//
-
-func GetDisciplineTests(disciplineID int) ([]byte, error) {
-	dbConn, err := db.ConnectDB()
+func GetDisciplineInfo(id int) ([]TestShort, error) {
+	// Проверка на существование дисциплины перед получением тестов
+	exists, err := disciplineExists(id)
 	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
+		return nil, fmt.Errorf("validation error: %v", err)
 	}
-	defer dbConn.Close()
+	if !exists {
+		return nil, fmt.Errorf("discipline with id %d not found or deleted", id)
+	}
 
-	rows, err := dbConn.Query(
-		`SELECT id, name 
-		 FROM test
-		 WHERE discipline_id = $1 AND is_deleted = FALSE`,
-		disciplineID,
-	)
+	query := "SELECT id, name FROM test WHERE discipline_id = $1 AND is_deleted = FALSE"
+	rows, err := storage.DB.Query(query, id)
 	if err != nil {
-		return nil, fmt.Errorf("Query: ошибка выполнения запроса: %v", err)
+		return nil, fmt.Errorf("failed to fetch tests: %v", err)
 	}
 	defer rows.Close()
-
-	var tests []TestShort
-
+	result := make([]TestShort, 0)
 	for rows.Next() {
 		var t TestShort
 		if err := rows.Scan(&t.ID, &t.Name); err != nil {
-			return nil, fmt.Errorf("rows.Scan: ошибка чтения строки: %v", err)
+			return nil, fmt.Errorf("scan test error: %v", err)
 		}
-		tests = append(tests, t)
+		result = append(result, t)
 	}
-
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err: ошибка при обработке результата: %v", err)
+		return nil, fmt.Errorf("rows error: %v", err)
 	}
-
-	jsonData, err := json.Marshal(tests)
-	if err != nil {
-		return nil, fmt.Errorf("Marshal: ошибка преобразования в JSON: %v", err)
-	}
-
-	return jsonData, nil
+	return result, nil
 }
 
-//
-// ===== Проверить активность теста =====
-//
-
-func IsTestActive(disciplineID int, testID int) (bool, error) {
-	dbConn, err := db.ConnectDB()
-	if err != nil {
-		return false, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
+func CheckTestState(disciplineID, testID int) (bool, error) {
+	query := "SELECT is_active FROM test WHERE id = $1 AND discipline_id = $2 AND is_deleted = FALSE"
 
 	var isActive bool
+	row := storage.DB.QueryRow(query, testID, disciplineID)
 
-	err = dbConn.QueryRow(
-		`SELECT is_active 
-		 FROM test 
-		 WHERE id = $1 AND discipline_id = $2 AND is_deleted = FALSE`,
-		testID,
-		disciplineID,
-	).Scan(&isActive)
-
-	if err != nil {
-		return false, fmt.Errorf("row.Scan: ошибка чтения результата: %v", err)
+	if err := row.Scan(&isActive); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, fmt.Errorf("test %d in discipline %d not found or deleted", testID, disciplineID)
+		}
+		return false, fmt.Errorf("database error: %v", err)
 	}
 
 	return isActive, nil
 }
 
-//
-// ===== Активировать / деактивировать тест =====
-//
-
-func SetTestActiveState(disciplineID int, testID int, active bool) error {
-	dbConn, err := db.ConnectDB()
+func ChangeTestState(newStatus bool, disciplineID, testID int) error {
+	query := "UPDATE test SET is_active = $1 WHERE id = $2 AND discipline_id = $3 AND is_deleted = FALSE"
+	res, err := storage.DB.Exec(query, newStatus, testID, disciplineID)
 	if err != nil {
-		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
+		return fmt.Errorf("failed to update test state: %v", err)
 	}
-	defer dbConn.Close()
-
-	_, err = dbConn.Exec(
-		`UPDATE test
-		 SET is_active = $3
-		 WHERE id = $1 AND discipline_id = $2 AND is_deleted = FALSE`,
-		testID,
-		disciplineID,
-		active,
-	)
-
+	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("Exec: ошибка обновления состояния теста: %v", err)
+		return fmt.Errorf("error checking affected rows: %v", err)
 	}
-
-	// если тест деактивирован — отмечаем попытки завершенными
-	if !active {
-		_, _ = dbConn.Exec(
-			`UPDATE attempt 
-			 SET status = 'completed', completed_at = NOW()
-			 WHERE test_id = $1 AND status = 'in_progress'`,
-			testID,
-		)
+	if rowsAffected == 0 {
+		return fmt.Errorf("test with id %d in discipline %d not found or deleted", testID, disciplineID)
 	}
-
 	return nil
 }
 
-//
-// ===== Добавить тест в дисциплину =====
-//
-
-func AddTestToDiscipline(disciplineID int, name string) error {
-	dbConn, err := db.ConnectDB()
-	if err != nil {
-		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
+func AddTest(disciplineID int, name string) (int, error) {
+	exists, _ := disciplineExists(disciplineID)
+	if !exists {
+		return 0, fmt.Errorf("cannot add test: discipline with id %d not found", disciplineID)
 	}
-	defer dbConn.Close()
-
-	_, err = dbConn.Exec(
-		`INSERT INTO test (discipline_id, name, is_active, is_deleted)
-		 VALUES ($1, $2, FALSE, FALSE)`,
-		disciplineID,
-		name,
-	)
-
-	if err != nil {
-		return fmt.Errorf("Exec: ошибка добавления теста: %v", err)
-	}
-
-	return nil
-}
-
-//
-// ===== Удалить тест (soft-delete) =====
-//
-
-func DeleteTest(testID int, disciplineID int) error {
-	dbConn, err := db.ConnectDB()
-	if err != nil {
-		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
-
-	_, err = dbConn.Exec(
-		`UPDATE test
-		 SET is_deleted = TRUE, is_active = FALSE
-		 WHERE id = $1 AND discipline_id = $2`,
-		testID,
-		disciplineID,
-	)
-
-	if err != nil {
-		return fmt.Errorf("Exec: ошибка пометки теста удалённым: %v", err)
-	}
-
-	return nil
-}
-
-//
-// ===== Список студентов дисциплины =====
-//
-
-func GetDisciplineStudents(disciplineID int) ([]byte, error) {
-	dbConn, err := db.ConnectDB()
-	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
-
-	rows, err := dbConn.Query(
-		`SELECT user_id 
-		 FROM user_discipline
-		 WHERE discipline_id = $1`,
-		disciplineID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("Query: ошибка выполнения запроса: %v", err)
-	}
-	defer rows.Close()
-
-	var students []StudentRef
-
-	for rows.Next() {
-		var s StudentRef
-		if err := rows.Scan(&s.UserID); err != nil {
-			return nil, fmt.Errorf("rows.Scan: ошибка чтения строки: %v", err)
-		}
-		students = append(students, s)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err: ошибка при обработке результата: %v", err)
-	}
-
-	jsonData, err := json.Marshal(students)
-	if err != nil {
-		return nil, fmt.Errorf("Marshal: ошибка преобразования в JSON: %v", err)
-	}
-
-	return jsonData, nil
-}
-
-//
-// ===== Записать студента на дисциплину =====
-//
-
-func EnrollStudent(userID int, disciplineID int) error {
-	dbConn, err := db.ConnectDB()
-	if err != nil {
-		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
-
-	_, err = dbConn.Exec(
-		`INSERT INTO user_discipline (user_id, discipline_id)
-		 VALUES ($1, $2)
-		 ON CONFLICT DO NOTHING`,
-		userID,
-		disciplineID,
-	)
-
-	if err != nil {
-		return fmt.Errorf("Exec: ошибка записи студента на дисциплину: %v", err)
-	}
-
-	return nil
-}
-
-//
-// ===== Отчислить студента с дисциплины =====
-//
-
-func RemoveStudent(userID int, disciplineID int) error {
-	dbConn, err := db.ConnectDB()
-	if err != nil {
-		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
-
-	_, err = dbConn.Exec(
-		`DELETE FROM user_discipline
-		 WHERE user_id = $1 AND discipline_id = $2`,
-		userID,
-		disciplineID,
-	)
-
-	if err != nil {
-		return fmt.Errorf("Exec: ошибка удаления студента с дисциплины: %v", err)
-	}
-
-	return nil
-}
-
-//
-// ===== Создать дисциплину =====
-//
-
-func CreateDiscipline(name string, description string, teacherID int) (int, error) {
-	dbConn, err := db.ConnectDB()
-	if err != nil {
-		return 0, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer dbConn.Close()
 
 	var id int
-
-	err = dbConn.QueryRow(
-		`INSERT INTO discipline (name, description, teacher_id)
-		 VALUES ($1, $2, $3)
-		 RETURNING id`,
-		name,
-		description,
-		teacherID,
-	).Scan(&id)
-
-	if err != nil {
-		return 0, fmt.Errorf("Exec: ошибка создания дисциплины: %v", err)
+	query := `INSERT INTO test(discipline_id, name, is_active, is_deleted)
+			  VALUES ($1, $2, FALSE, FALSE) 
+			  RETURNING id;`
+	if err := storage.DB.QueryRow(query, disciplineID, name).Scan(&id); err != nil {
+		return 0, fmt.Errorf("failed to create test: %v", err)
 	}
-
 	return id, nil
 }
 
-//
-// ===== Удалить дисциплину =====
-//
+func DeleteTest(disciplineID int, testID int) error {
+	query := `UPDATE test SET is_deleted = TRUE WHERE discipline_id = $1 AND id = $2 AND is_deleted = FALSE`
+	res, err := storage.DB.Exec(query, disciplineID, testID)
+	if err != nil {
+		return fmt.Errorf("failed to delete test: %v", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error checking affected rows: %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("test with id %d in discipline %d does not exist or already deleted", testID, disciplineID)
+	}
+	return nil
+}
+
+func GetListStudents(disciplineID int) ([]int, error) {
+	existsDiscipline, err := disciplineExists(disciplineID)
+	if err != nil {
+		return nil, fmt.Errorf("validation error: %v", err)
+	}
+	if !existsDiscipline {
+		return nil, fmt.Errorf("discipline with id %d not exists or deleted", disciplineID)
+	}
+
+	result := make([]int, 0)
+	query := `SELECT user_id FROM user_discipline WHERE discipline_id = $1`
+	rows, err := storage.DB.Query(query, disciplineID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch students: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan user id error: %v", err)
+		}
+		result = append(result, id)
+	}
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("rows error: %v", rows.Err())
+	}
+	return result, nil
+}
+
+func AddUser(userID, disciplineID int) error {
+	existsUser, err := userExists(userID)
+	if err != nil {
+		return fmt.Errorf("validation error: %v", err)
+	}
+	if !existsUser {
+		return fmt.Errorf("user with id %d does not exist", userID)
+	}
+	existsDiscipline, err := disciplineExists(disciplineID)
+	if err != nil {
+		return fmt.Errorf("validation error: %v", err)
+	}
+	if !existsDiscipline {
+		return fmt.Errorf("discipline with id %d does not exist or deleted", disciplineID)
+	}
+
+	var dummy int
+	checkQuery := "SELECT 1 FROM user_discipline WHERE user_id = $1 AND discipline_id = $2"
+	err = storage.DB.QueryRow(checkQuery, userID, disciplineID).Scan(&dummy)
+	if err == nil {
+		return fmt.Errorf("user is already enrolled in this discipline")
+	}
+
+	query := `INSERT INTO user_discipline(user_id, discipline_id) VALUES ($1, $2);`
+	_, err = storage.DB.Exec(query, userID, disciplineID)
+	if err != nil {
+		return fmt.Errorf("failed to enroll student: %v", err)
+	}
+	return nil
+}
+
+func RemoveUser(userID, disciplineID int) error {
+	existsUser, err := userExists(userID)
+	if err != nil {
+		return fmt.Errorf("validation error: %v", err)
+	}
+	if !existsUser {
+		return fmt.Errorf("user with id %d does not exist", userID)
+	}
+	existsDiscipline, err := disciplineExists(disciplineID)
+	if err != nil {
+		return fmt.Errorf("validation error: %v", err)
+	}
+	if !existsDiscipline {
+		return fmt.Errorf("discipline with id %d does not exist or deleted", disciplineID)
+	}
+	query := "DELETE FROM user_discipline WHERE user_id = $1 AND discipline_id = $2"
+	res, err := storage.DB.Exec(query, userID, disciplineID)
+	if err != nil {
+		return fmt.Errorf("failed to remove user: %v", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error checking affected rows: %v", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("student with id %d is not enrolled in discipline %d", userID, disciplineID)
+	}
+	return nil
+}
+
+func CreateDiscipline(name, description string, teacher_id int) (int, error) {
+	exists, err := userExists(teacher_id)
+	if err != nil {
+		return 0, fmt.Errorf("validation error: %v", err)
+	}
+	if !exists {
+		return 0, fmt.Errorf("failed to create discipline: teacher with id %d does not exist", teacher_id)
+	}
+
+	var id int
+	query := `INSERT INTO discipline(teacher_id, name, description)
+              VALUES ($1, $2, $3)
+              RETURNING id;`
+	row := storage.DB.QueryRow(query, teacher_id, name, description)
+	if err := row.Scan(&id); err != nil {
+		return 0, fmt.Errorf("failed to insert discipline: %v", err)
+	}
+	return id, nil
+}
 
 func DeleteDiscipline(disciplineID int) error {
-	dbConn, err := db.ConnectDB()
+	existsDiscipline, err := disciplineExists(disciplineID)
 	if err != nil {
-		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
+		return fmt.Errorf("validation error: %v", err)
 	}
-	defer dbConn.Close()
-
-	_, err = dbConn.Exec(
-		`UPDATE discipline
-		 SET description = description, teacher_id = teacher_id
-		 WHERE id = $1`,
-		disciplineID,
-	)
-
+	if !existsDiscipline {
+		return fmt.Errorf("discipline with id %d does not exist or already deleted", disciplineID)
+	}
+	query := "UPDATE discipline SET is_deleted = TRUE WHERE id = $1"
+	_, err = storage.DB.Exec(query, disciplineID)
 	if err != nil {
-		return fmt.Errorf("Exec: ошибка пометки дисциплины удалённой: %v", err)
+		return fmt.Errorf("failed to delete discipline: %v", err)
 	}
-
 	return nil
 }

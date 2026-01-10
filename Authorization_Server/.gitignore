@@ -1,0 +1,7 @@
+build/
+*.o
+*.exe
+authorization_server
+config/config.json
+.DS_Store
+.vscode/

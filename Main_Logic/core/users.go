@@ -2,323 +2,196 @@ package core
 
 import (
 	"database/sql"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"main_logic/db"
-	"sort"
 
-	_ "github.com/lib/pq"
+	"main_logic/storage"
 )
 
-type User struct {
-	ID       int    `json:"id"`
-	FullName string `json:"full_name"`
+// Структуры для возврата информации о пользователе
+
+// UserTest содержит информацию о тесте и оценке пользователя
+type UserTest struct {
+	ID    int
+	Name  string
+	Score int
 }
 
-// Получение всех пользователей
-func GetUsers() ([]byte, error) {
-	db, err := db.ConnectDB()
-	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer db.Close()
+// UserDiscipline содержит информацию о дисциплине и тестах в ней
+type UserDiscipline struct {
+	ID    int
+	Name  string
+	Tests []UserTest
+}
 
-	// Выполняем запрос
-	rows, err := db.Query("SELECT id, full_name FROM users")
+// UserData содержит полную информацию о пользователе (курсы, тесты, оценки)
+type UserData struct {
+	Disciplines []UserDiscipline
+}
+
+// ============================================================================
+
+// GetUserData возвращает информацию о пользователе (курсы, тесты, оценки)
+func GetUserData(id int) (UserData, error) {
+	var result UserData
+	result.Disciplines = make([]UserDiscipline, 0)
+
+	// 1. Собираем ID дисциплин пользователя
+	userDiscID := make([]int, 0)
+	rows, err := storage.DB.Query(
+		"SELECT discipline_id FROM user_discipline WHERE user_id = $1",
+		id,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("Query: ошибка выполнения запроса: %v", err)
+		return result, fmt.Errorf("failed to fetch user disciplines: %v", err)
 	}
 	defer rows.Close()
 
-	// Собираем всех юзеров в один слайс
-	var users []User
 	for rows.Next() {
-		var user User
-		if err := rows.Scan(&user.ID, &user.FullName); err != nil {
-			return nil, fmt.Errorf("rows.Scan: ошибка чтения строки: %v", err)
+		var discID int
+		if err := rows.Scan(&discID); err != nil {
+			return result, fmt.Errorf("scan error: %v", err)
 		}
-		users = append(users, user)
+		userDiscID = append(userDiscID, discID)
 	}
-
-	// Проверка ошибок после итерации
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err: ошибка при обработке результата: %v", err)
+		return result, fmt.Errorf("rows error: %v", err)
 	}
 
-	// Преобразуем в JSON
-	jsonData, err := json.Marshal(users)
-	if err != nil {
-		return nil, fmt.Errorf("Marshal: ошибка преобразования в JSON: %v", err)
-	}
+	// 2. Для каждой дисциплины собираем имя и тесты
+	for _, discID := range userDiscID {
+		var d UserDiscipline
+		d.ID = discID
 
-	return jsonData, nil
-}
-
-func GetUserById(ID int) (string, error) {
-	db, err := db.ConnectDB()
-	if err != nil {
-		return "", fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer db.Close()
-
-	query := "SELECT full_name FROM users WHERE id = $1"
-	row := db.QueryRow(query, ID)
-
-	var answer string
-	if err := row.Scan(&answer); err != nil {
-		if err == sql.ErrNoRows {
-			return "", fmt.Errorf("пользователь с id %d не найден", ID)
+		if err := storage.DB.QueryRow(
+			"SELECT name FROM discipline WHERE id = $1 AND is_deleted = FALSE",
+			discID,
+		).Scan(&d.Name); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			return result, fmt.Errorf("failed to fetch discipline name: %v", err)
 		}
-		return "", fmt.Errorf("row.Scan: ошибка чтения строки: %v", err)
+
+		testsRows, err := storage.DB.Query(
+			"SELECT id, name FROM test WHERE discipline_id = $1 AND is_deleted = FALSE",
+			discID,
+		)
+		if err != nil {
+			return result, fmt.Errorf("failed to fetch tests: %v", err)
+		}
+
+		allTests := make([]UserTest, 0)
+
+		for testsRows.Next() {
+			var t UserTest
+			if err := testsRows.Scan(&t.ID, &t.Name); err != nil {
+				testsRows.Close()
+				return result, fmt.Errorf("scan test error: %v", err)
+			}
+
+			// 3. Подтягиваем балл пользователя, если попытки нет — ставим 0
+			scoreErr := storage.DB.QueryRow(
+				"SELECT score FROM attempt WHERE user_id = $1 AND test_id = $2",
+				id, t.ID,
+			).Scan(&t.Score)
+
+			if scoreErr != nil {
+				if errors.Is(scoreErr, sql.ErrNoRows) {
+					t.Score = 0
+				} else {
+					testsRows.Close()
+					return result, fmt.Errorf("score fetch error: %v", scoreErr)
+				}
+			}
+
+			allTests = append(allTests, t)
+		}
+
+		testsRows.Close()
+		d.Tests = allTests
+		result.Disciplines = append(result.Disciplines, d)
 	}
 
-	return answer, nil
+	return result, nil
 }
 
-// сменяет имя
-func ChangeUserName(ID int, NewName string) error {
-	db, err := db.ConnectDB()
+// GetUserRoles возвращает массив ролей пользователя
+func GetUserRoles(id int) ([]string, error) {
+	query := "SELECT role FROM user_role WHERE user_id = $1"
+	rows, err := storage.DB.Query(query, id)
 	if err != nil {
-		return fmt.Errorf("ConnectDB: %v", err)
+		return nil, fmt.Errorf("failed to fetch roles: %v", err)
 	}
-	defer db.Close()
+	result := make([]string, 0)
+	defer rows.Close()
 
-	QueryRequest := "UPDATE users SET full_name = $1 WHERE id = $2"
-	result, err := db.Exec(QueryRequest, NewName, ID)
+	for rows.Next() {
+		var r string
+		if err := rows.Scan(&r); err != nil {
+			return nil, fmt.Errorf("scan role error: %v", err)
+		}
+		result = append(result, r)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %v", err)
+	}
 
+	return result, nil
+}
+
+// UpdateUserRoles заменяет все роли пользователя на указанные
+func UpdateUserRoles(id int, roles []string) error {
+	// Сначала удаляем все старые роли
+	_, err := storage.DB.Exec("DELETE FROM user_role WHERE user_id = $1", id)
 	if err != nil {
-		return fmt.Errorf("Query: ошибка выполнения запроса: %v", err)
+		return fmt.Errorf("failed to clear old roles: %v", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("RowsAffected %v: ", err)
+	// Затем добавляем новые роли
+	for _, r := range roles {
+		_, err = storage.DB.Exec(
+			"INSERT INTO user_role (user_id, role) VALUES ($1, $2)",
+			id, r,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to insert role %s: %v", r, err)
+		}
 	}
-	if rowsAffected == 0 {
-		return fmt.Errorf("Пользователь с ID %d не найден", ID)
-	}
+
 	return nil
 }
 
-func GetUserData(ID int) ([]byte, error) {
-	db, err := db.ConnectDB()
-	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer db.Close()
-
-	query := `
-		SELECT 
-			d.id AS discipline_id,
-			d.name AS discipline_name,
-			d.description AS discipline_description,
-			t.id AS test_id,
-			t.name AS test_name,
-			t.is_active AS test_is_active,
-			t.version AS test_version,
-			a.score AS attempt_score,
-			a.status AS attempt_status,
-			TO_CHAR(a.started_at, 'HH24:MI') AS started_at,
-			TO_CHAR(a.completed_at, 'HH24:MI') AS completed_at
-		FROM user_discipline ud
-		JOIN discipline d ON ud.discipline_id = d.id
-		JOIN test t ON t.discipline_id = d.id 
-			AND t.is_active = TRUE 
-			AND t.is_deleted = FALSE
-		LEFT JOIN attempt a ON a.test_id = t.id 
-			AND a.user_id = ud.user_id
-			AND a.status = 'completed'
-		WHERE ud.user_id = $1
-			AND EXISTS (
-				SELECT 1 FROM test t2 
-				WHERE t2.discipline_id = d.id 
-				AND t2.is_active = TRUE 
-				AND t2.is_deleted = FALSE
-			)
-		ORDER BY d.name, t.id
-	`
-
-	rows, err := db.Query(query, ID)
-	if err != nil {
-		return nil, fmt.Errorf("Query: ошибка при получении данных: %v", err)
-	}
-	defer rows.Close()
-
-	type TestData struct {
-		ID          int     `json:"id"`
-		Name        string  `json:"name"`
-		IsActive    bool    `json:"is_active"`
-		Version     int     `json:"version"`
-		Score       *int    `json:"score"`
-		Status      *string `json:"status"`
-		StartedAt   *string `json:"started_at"`
-		CompletedAt *string `json:"completed_at"`
-	}
-
-	type DisciplineData struct {
-		ID          int        `json:"id"`
-		Name        string     `json:"name"`
-		Description string     `json:"description"`
-		Tests       []TestData `json:"tests"`
-	}
-
-	disciplinesMap := make(map[int]*DisciplineData)
-
-	for rows.Next() {
-		var (
-			disciplineID          int
-			disciplineName        string
-			disciplineDescription string
-			testID                int
-			testName              string
-			testIsActive          bool
-			testVersion           int
-			attemptScore          *int
-			attemptStatus         *string
-			startedAt             *string
-			completedAt           *string
-		)
-
-		err := rows.Scan(
-			&disciplineID,
-			&disciplineName,
-			&disciplineDescription,
-			&testID,
-			&testName,
-			&testIsActive,
-			&testVersion,
-			&attemptScore,
-			&attemptStatus,
-			&startedAt,
-			&completedAt,
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("rows.Scan: ошибка чтения строки: %v", err)
-		}
-
-		disc, exists := disciplinesMap[disciplineID]
-		if !exists {
-			disc = &DisciplineData{
-				ID:          disciplineID,
-				Name:        disciplineName,
-				Description: disciplineDescription,
-				Tests:       []TestData{},
-			}
-			disciplinesMap[disciplineID] = disc
-		}
-
-		test := TestData{
-			ID:          testID,
-			Name:        testName,
-			IsActive:    testIsActive,
-			Version:     testVersion,
-			Score:       attemptScore,
-			Status:      attemptStatus,
-			StartedAt:   startedAt,
-			CompletedAt: completedAt,
-		}
-
-		disc.Tests = append(disc.Tests, test)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows.Err: ошибка при обработке результатов: %v", err)
-	}
-
-	if len(disciplinesMap) == 0 {
-		return []byte("[]"), nil
-	}
-
-	disciplines := make([]DisciplineData, 0, len(disciplinesMap))
-	for _, disc := range disciplinesMap {
-		disciplines = append(disciplines, *disc)
-	}
-
-	sort.Slice(disciplines, func(i, j int) bool {
-		return disciplines[i].Name < disciplines[j].Name
-	})
-
-	jsonData, err := json.Marshal(disciplines)
-	if err != nil {
-		return nil, fmt.Errorf("json.Marshal: ошибка при формировании JSON: %v", err)
-	}
-
-	return jsonData, nil
-}
-
-// возвращает JSON с ролями пользователя
-func GetUserRoles(ID int) ([]byte, error) {
-	db, err := db.ConnectDB()
-	if err != nil {
-		return nil, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer db.Close()
-
-	query := "SELECT roles FROM users WHERE id = $1"
-	row := db.QueryRow(query, ID)
-
-	var roles []byte
-	err = row.Scan(&roles)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("пользователь с id %d не найден", ID)
-		}
-		return nil, fmt.Errorf("row.Scan: ошибка чтения ролей: %v", err)
-	}
-
-	// Если roles пустой, возвращаем пустой JSON массив
-	if roles == nil || len(roles) == 0 {
-		return []byte("[]"), nil
-	}
-
-	return roles, nil
-}
-
-// Возвращает поле is_blocked из таблицы users
-func IsUserBlocked(ID int) (bool, error) {
-	db, err := db.ConnectDB()
-	if err != nil {
-		return false, fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer db.Close()
-
+// IsUserBlocked проверяет, заблокирован ли пользователь
+func IsUserBlocked(id int) (bool, error) {
+	var blocked bool
 	query := "SELECT is_blocked FROM users WHERE id = $1"
-	row := db.QueryRow(query, ID)
-
-	var isBlocked bool
-	err = row.Scan(&isBlocked)
+	err := storage.DB.QueryRow(query, id).Scan(&blocked)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return false, fmt.Errorf("пользователь с id %d не найден", ID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, fmt.Errorf("user with id %d not found", id)
 		}
-		return false, fmt.Errorf("row.Scan: ошибка чтения статуса блокировки: %v", err)
+		return false, fmt.Errorf("database error: %v", err)
 	}
-
-	return isBlocked, nil
+	return blocked, nil
 }
 
-//ф-ция принимает на вход ID пользователя и параметр block (true - заблокировать, false - заблокировать)
-func SetUserBlockStatus(ID int, block bool) error {
-	db, err := db.ConnectDB()
-	if err != nil {
-		return fmt.Errorf("ConnectDB: ошибка подключения к БД: %v", err)
-	}
-	defer db.Close()
-
+// ChangeBlockStatus изменяет статус блокировки пользователя
+func ChangeBlockStatus(id int, blocked bool) error {
 	query := "UPDATE users SET is_blocked = $1 WHERE id = $2"
-	result, err := db.Exec(query, block, ID)
+	res, err := storage.DB.Exec(query, blocked, id)
 	if err != nil {
-		return fmt.Errorf("Exec: ошибка при обновлении статуса блокировки: %v", err)
+		return fmt.Errorf("failed to update block status: %v", err)
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("RowsAffected: ошибка при проверке обновленных строк: %v", err)
+		return fmt.Errorf("rows affected error: %v", err)
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("пользователь с id %d не найден", ID)
+		return fmt.Errorf("user with id %d does not exist", id)
 	}
+
 	return nil
 }
