@@ -6,11 +6,10 @@
 #include "../libs/json/json.hpp"
 #include "../include/session_storage.hpp"
 
-SessionStorage session_storage;
-
 using json = nlohmann::json;
 using namespace httplib;
 
+SessionStorage session_storage;
 json config;
 
 // загрузка конфигурации сервера из json файла
@@ -85,7 +84,7 @@ int main() {
         std::string login_token = req.get_param_value("state");
         if (type.empty() || login_token.empty()) {
             res.status = 400;
-            res.set_content("{\"error\":\"Отсутствуют параметры\"}", "application/json");
+            res.set_content("{\"error\":\"Missing parameters\"}", "application/json");
             return;
         }
         
@@ -120,25 +119,55 @@ int main() {
             // будет генерация кода
 
             response["auth_type"] = "code";
-            response["message"] = "Генерация кода еще не реализована";
+            response["message"] = "Code generation not implemented yet";
         } else {
             res.status = 400;
-            res.set_content("{\"error\":\"Неподдерживаемый тип авторизации\"}", "application/json");
+            res.set_content("{\"error\":\"Unsupported auth type\"}", "application/json");
             return;
         }
         
         res.set_content(response.dump(), "application/json");
     });
     
-    // проверка статуса
+    // эндпоинт /check - проверка статуса сессии
     svr.Get("/check", [](const Request& req, Response& res) {
 
         // CORS заголовки
         set_cors_headers(res);
 
-        std::string state = req.get_param_value("state");
-        std::cout << "GET /check - state: " << state << std::endl;
-        res.set_content("{\"message\":\"Check endpoint\"}", "application/json");
+        std::string state_token = req.get_param_value("state");
+        if (state_token.empty()) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Missing state token\"}", "application/json");
+            return;
+        }
+        
+        auto session_opt = session_storage.get_session(state_token);
+        if (!session_opt) {
+            res.status = 404;
+            res.set_content("{\"error\":\"Session not found\"}", "application/json");
+            return;
+        }
+        
+        AuthSession session = session_opt.value();
+        if (session.is_expired()) {
+            session.status = AuthStatus::EXPIRED;
+            session_storage.update_session(session);
+        }
+        
+        json response = {
+            {"state_token", session.state_token},
+            {"status", static_cast<int>(session.status)},
+            {"provider", session.provider},
+            {"expires_at", std::chrono::duration_cast<std::chrono::seconds>(session.expires_at.time_since_epoch()).count()}
+        };
+        
+        if (session.status == AuthStatus::GRANTED) {
+            response["access_token"] = "JWT_ACCESS_TOKEN_PLACEHOLDER";
+            response["refresh_token"] = "JWT_REFRESH_TOKEN_PLACEHOLDER";
+        }
+        
+        res.set_content(response.dump(), "application/json");
     });
     
     // callback от GitHub
