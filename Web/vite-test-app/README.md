@@ -17,3 +17,5 @@ docker-compose down
 
 # Просмотр логов
 docker-compose logs -f
+
+redis-server  
