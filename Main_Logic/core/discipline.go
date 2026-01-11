@@ -8,25 +8,25 @@ import (
 )
 
 type Discipline struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name        string
+	Description string
+	ID          int
 }
 
 type DisciplineDTO struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	TeacherID   int    `json:"teacher_id"`
+	Name        string
+	Description string
+	TeacherID   int
 }
 
 type TestShort struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID   int
+	Name string
 }
 
 type StudentShort struct {
-	ID       int    `json:"id"`
-	FullName string `json:"full_name"`
+	ID       int
+	FullName string
 }
 
 func GetAllDisciplines() ([]Discipline, error) {
@@ -57,6 +57,7 @@ func GetDisciplineByID(id int) (DisciplineDTO, error) {
 	var isDeleted bool
 	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
 	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return DisciplineDTO{}, fmt.Errorf("discipline with id %d not found", id)
@@ -70,6 +71,7 @@ func GetDisciplineByID(id int) (DisciplineDTO, error) {
 
 	query := "SELECT name, description, teacher_id FROM discipline WHERE id = $1"
 	row := storage.DB.QueryRow(query, id)
+
 	var result DisciplineDTO
 	if scanErr := row.Scan(&result.Name, &result.Description, &result.TeacherID); scanErr != nil {
 		return DisciplineDTO{}, fmt.Errorf("failed to scan discipline: %v", scanErr)
@@ -82,6 +84,7 @@ func ChangeDiscInfo(id int, newName string, newDescription string) error {
 	var isDeleted bool
 	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
 	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("discipline with id %d not found", id)
@@ -95,43 +98,9 @@ func ChangeDiscInfo(id int, newName string, newDescription string) error {
 
 	query := "UPDATE discipline SET name = $1, description = $2 WHERE id = $3"
 	_, err = storage.DB.Exec(query, newName, newDescription, id)
+
 	if err != nil {
 		return fmt.Errorf("failed to update discipline: %v", err)
-	}
-
-	return nil
-}
-
-func CreateDiscipline(name string, description string, teacherID int) (int, error) {
-	query := `INSERT INTO discipline(name, description, teacher_id, is_deleted)
-	VALUES ($1, $2, $3, FALSE)
-	RETURNING id;`
-	var id int
-	if err := storage.DB.QueryRow(query, name, description, teacherID).Scan(&id); err != nil {
-		return 0, fmt.Errorf("failed to create discipline: %v", err)
-	}
-	return id, nil
-}
-
-func DeleteDiscipline(id int) error {
-	var isDeleted bool
-	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
-	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("discipline with id %d not found", id)
-		}
-		return fmt.Errorf("failed to check discipline: %v", err)
-	}
-
-	if isDeleted {
-		return fmt.Errorf("discipline with id %d already deleted", id)
-	}
-
-	query := "UPDATE discipline SET is_deleted = TRUE WHERE id = $1"
-	_, err = storage.DB.Exec(query, id)
-	if err != nil {
-		return fmt.Errorf("failed to delete discipline: %v", err)
 	}
 
 	return nil
@@ -141,6 +110,7 @@ func GetDisciplineInfo(id int) ([]TestShort, error) {
 	var isDeleted bool
 	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
 	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("discipline with id %d not found", id)
@@ -177,8 +147,10 @@ func GetDisciplineInfo(id int) ([]TestShort, error) {
 
 func CheckTestState(disciplineID, testID int) (bool, error) {
 	query := "SELECT is_active FROM test WHERE id = $1 AND discipline_id = $2 AND is_deleted = FALSE"
+
 	var isActive bool
 	row := storage.DB.QueryRow(query, testID, disciplineID)
+
 	if err := row.Scan(&isActive); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, fmt.Errorf("test with id %d not found in discipline %d", testID, disciplineID)
@@ -209,10 +181,7 @@ func ChangeTestState(newStatus bool, disciplineID, testID int) error {
 }
 
 func AddTest(disciplineID int, name string) (int, error) {
-	exists, err := disciplineExists(disciplineID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to check discipline: %v", err)
-	}
+	exists, _ := disciplineExists(disciplineID)
 	if !exists {
 		return 0, fmt.Errorf("discipline with id %d not found", disciplineID)
 	}
@@ -232,6 +201,7 @@ func DeleteTest(disciplineID int, testID int) error {
 	var isDeleted bool
 	checkQuery := "SELECT is_deleted FROM test WHERE id = $1 AND discipline_id = $2"
 	err := storage.DB.QueryRow(checkQuery, testID, disciplineID).Scan(&isDeleted)
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("test with id %d not found in discipline %d", testID, disciplineID)
@@ -256,6 +226,7 @@ func GetListStudents(disciplineID int) ([]StudentShort, error) {
 	var isDeleted bool
 	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
 	err := storage.DB.QueryRow(checkQuery, disciplineID).Scan(&isDeleted)
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("discipline with id %d not found", disciplineID)
@@ -274,7 +245,6 @@ func GetListStudents(disciplineID int) ([]StudentShort, error) {
 	JOIN users u ON ud.user_id = u.id
 	WHERE ud.discipline_id = $1
 	`
-
 	rows, err := storage.DB.Query(query, disciplineID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch students: %v", err)
@@ -313,7 +283,14 @@ func AddUser(userID, disciplineID int) error {
 		return fmt.Errorf("discipline with id %d not found", disciplineID)
 	}
 
-	query := "INSERT INTO user_discipline(user_id, discipline_id) VALUES ($1, $2)"
+	var dummy int
+	checkQuery := "SELECT 1 FROM user_discipline WHERE user_id = $1 AND discipline_id = $2"
+	err = storage.DB.QueryRow(checkQuery, userID, disciplineID).Scan(&dummy)
+	if err == nil {
+		return fmt.Errorf("user with id %d already enrolled in discipline %d", userID, disciplineID)
+	}
+
+	query := `INSERT INTO user_discipline(user_id, discipline_id) VALUES ($1, $2);`
 	_, err = storage.DB.Exec(query, userID, disciplineID)
 	if err != nil {
 		return fmt.Errorf("failed to add user to discipline: %v", err)
@@ -323,6 +300,27 @@ func AddUser(userID, disciplineID int) error {
 }
 
 func RemoveUser(userID, disciplineID int) error {
+	existsUser, err := userExists(userID)
+	if err != nil {
+		return fmt.Errorf("failed to check user: %v", err)
+	}
+	if !existsUser {
+		return fmt.Errorf("user with id %d not found", userID)
+	}
+
+	var isDeleted bool
+	checkDiscQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
+	err = storage.DB.QueryRow(checkDiscQuery, disciplineID).Scan(&isDeleted)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("discipline with id %d not found", disciplineID)
+		}
+		return fmt.Errorf("failed to check discipline: %v", err)
+	}
+	if isDeleted {
+		return fmt.Errorf("discipline with id %d not found", disciplineID)
+	}
+
 	query := "DELETE FROM user_discipline WHERE user_id = $1 AND discipline_id = $2"
 	res, err := storage.DB.Exec(query, userID, disciplineID)
 	if err != nil {
@@ -335,7 +333,63 @@ func RemoveUser(userID, disciplineID int) error {
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("user with id %d not found in discipline %d", userID, disciplineID)
+		return fmt.Errorf("user with id %d not enrolled in discipline %d", userID, disciplineID)
+	}
+
+	return nil
+}
+
+func CreateDiscipline(name, description string, teacher_id int) (int, error) {
+	if name == "" || description == "" {
+		return 0, fmt.Errorf("name and description cannot be empty")
+	}
+
+	exists, err := userExists(teacher_id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check teacher: %v", err)
+	}
+	if !exists {
+		return 0, fmt.Errorf("teacher with id %d not found", teacher_id)
+	}
+
+	var id int
+	query := `INSERT INTO discipline(teacher_id, name, description)
+	VALUES ($1, $2, $3)
+	RETURNING id;`
+	row := storage.DB.QueryRow(query, teacher_id, name, description)
+	if err := row.Scan(&id); err != nil {
+		return 0, fmt.Errorf("failed to create discipline: %v", err)
+	}
+
+	return id, nil
+}
+
+func DeleteDiscipline(disciplineID int) error {
+	var isDeleted bool
+	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
+	err := storage.DB.QueryRow(checkQuery, disciplineID).Scan(&isDeleted)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("discipline with id %d not found", disciplineID)
+		}
+		return fmt.Errorf("failed to check discipline: %v", err)
+	}
+
+	if isDeleted {
+		return fmt.Errorf("discipline with id %d already deleted", disciplineID)
+	}
+
+	query := "UPDATE discipline SET is_deleted = TRUE WHERE id = $1"
+	_, err = storage.DB.Exec(query, disciplineID)
+	if err != nil {
+		return fmt.Errorf("failed to delete discipline: %v", err)
+	}
+
+	queryTest := "UPDATE test SET is_deleted = TRUE WHERE discipline_id = $1"
+	_, err = storage.DB.Exec(queryTest, disciplineID)
+	if err != nil {
+		return fmt.Errorf("failed to delete tests: %v", err)
 	}
 
 	return nil
