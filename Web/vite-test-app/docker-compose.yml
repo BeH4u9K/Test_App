@@ -1,49 +1,14 @@
 version: '3.8'
-
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: app-redis
-    restart: unless-stopped
+  vite-app:
+    build: .
+    container_name: my-vite-app
     ports:
-      - "6379:6379"
+      - "5173:5173"
     volumes:
-      - redis-data:/data
-    command: >
-      redis-server
-      --appendonly yes
-      --loglevel verbose  # Подробные логи
-    networks:
-      - app-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: vite-react-app
-    ports:
-      - "80:80"
-    restart: unless-stopped
-    depends_on:
-      - redis
-    networks:
-      - app-network
+      - .:/app
+      - /app/node_modules
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
       - NODE_ENV=development
-    # Для просмотра логов приложения
-    stdin_open: true
-    tty: true
-
-networks:
-  app-network:
-    driver: bridge
-
-volumes:
-  redis-data:
+      - CHOKIDAR_USEPOLLING=true
+    command: npm run dev -- --host 0.0.0.0
