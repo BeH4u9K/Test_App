@@ -1,1 +1,16 @@
 .env
+*.env
+config.json
+secrets/
+__pycache__/
+*.pyc
+venv/
+env/
+*.db
+*.sqlite
+bot_data/
+user_data/
+.DS_Store
+*.log
+.vscode/
+.idea/
