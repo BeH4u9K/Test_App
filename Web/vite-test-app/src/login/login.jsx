@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { styled } from '@mui/system';
 import gitIcon from '../IMG/git.png';
 import codeIcon from '../IMG/code.png';
@@ -41,7 +41,6 @@ const Button = styled('button')({
   height: '100px',
   backgroundColor: 'transparent',
   borderRadius: '50%',
-  margin: '0',
   border: '4px solid #7E866A',
   cursor: 'pointer',
   display: 'flex',
@@ -49,25 +48,12 @@ const Button = styled('button')({
   justifyContent: 'center',
   padding: '0',
   overflow: 'hidden',
-  transition: 'all 0.3s ease',
-  boxShadow: '0 6px 15px rgba(0, 0, 0, 0.2)',
-  
-  '&:hover': {
-    transform: 'scale(1.1)',
-    borderColor: '#6A7359',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
-  },
-  
-  '&:active': {
-    transform: 'scale(0.95)',
-    borderColor: '#9DB7A2',
-    borderWidth: '6px',
-  },
-  
-  '&:focus': {
-    outline: 'none',
-    boxShadow: '0 0 0 4px rgba(126, 134, 106, 0.4)',
-  },
+  '&:hover': { transform: 'scale(1.1)', borderColor: '#6A7359' },
+  '&:disabled': {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+    '&:hover': { transform: 'none', borderColor: '#7E866A' }
+  }
 });
 
 const IconImage = styled('img')({
@@ -75,15 +61,6 @@ const IconImage = styled('img')({
   height: '100%',
   objectFit: 'cover',
   borderRadius: '50%',
-  transition: 'transform 0.3s ease',
-  
-  'button:hover &': {
-    transform: 'scale(1.05)',
-  },
-  
-  'button:active &': {
-    transform: 'scale(0.95)',
-  },
 });
 
 const ButtonLabel = styled('div')({
@@ -100,48 +77,199 @@ const Label = styled('span')({
   fontSize: '14px',
   fontWeight: 600,
   color: '#2C3E50',
-  padding: '5px',
 });
 
+const StatusMessage = styled('div')({
+  marginTop: '20px',
+  padding: '10px',
+  borderRadius: '5px',
+  textAlign: 'center',
+  fontSize: '14px',
+  fontWeight: 500,
+  minHeight: '20px',
+  width: '100%',
+});
+
+const LoadingSpinner = styled('div')({
+  display: 'inline-block',
+  width: '20px',
+  height: '20px',
+  border: '3px solid #2C3E50',
+  borderTop: '3px solid transparent',
+  borderRadius: '50%',
+  animation: 'spin 1s linear infinite',
+  marginRight: '10px',
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
+  }
+});
+
+// Функция для генерации токенов
+const generateToken = () => {
+  const array = new Uint8Array(32);
+  window.crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+};
+
+// Функция для установки куки
+const setCookie = (name, value, days = 7) => {
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${name}=${value}; expires=${expires}; path=/; HttpOnly; SameSite=Strict`;
+};
+
+// Функция для отправки запроса на сервер
+const sendAuthRequest = async (authUrl) => {
+  try {
+    console.log('Отправляю запрос на сервер:', authUrl);
+    
+    const response = await fetch(authUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      mode: 'cors',
+    });
+
+    console.log('Статус ответа:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ошибка! Статус: ${response.status}, Текст: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Ответ от сервера:', data);
+    
+    return { success: true, data };
+    
+  } catch (error) {
+    console.error('Ошибка при отправке запроса:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 function Login() {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+
+  // Проверяем параметры URL при загрузке
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const type = params.get('type');
+    
+    if (type && ['github', 'code', 'yandex'].includes(type)) {
+      handleAuthFlow(type);
+    }
+  }, []);
+
+  // Основная функция для обработки авторизации
+  const handleAuthFlow = async (provider) => {
+    setLoading(true);
+    setStatus(`Начинаем авторизацию через ${provider}...`);
+    setError('');
+
+    try {
+      // 1. Генерируем токены
+      const sessionToken = generateToken();
+      const loginToken = generateToken();
+      
+      // 2. Устанавливаем куку
+      setCookie('session', sessionToken, 1);
+      
+      // 3. Выводим в консоль для отладки
+      console.log(`${provider} | Session: ${sessionToken} | Login: ${loginToken}`);
+      
+      // 4. Формируем URL для модуля авторизации
+      let authUrl;
+      
+      switch(provider.toLowerCase()) {
+        case 'github':
+          authUrl = `http://localhost:8080/auth?type=github&state=${loginToken}`;
+          break;
+        case 'yandex':
+          authUrl = `http://localhost:8080/auth?type=yandex&state=${loginToken}`;
+          break;
+        case 'code':
+          authUrl = `http://localhost:8080/auth?type=code&state=${loginToken}`;
+          break;
+        default:
+          throw new Error(`Неизвестный провайдер: ${provider}`);
+      }
+      
+      setStatus(`Отправляем запрос на сервер...`);
+      
+      // 5. Отправляем запрос на сервер
+      const result = await sendAuthRequest(authUrl);
+      
+      if (result.success) {
+        setStatus(`✅ Авторизация через ${provider} успешно инициирована!`);
+        console.log('Токен сессии установлен:', sessionToken);
+        console.log('Токен входа отправлен:', loginToken);
+        
+        // Здесь можно добавить редирект или другие действия после успешной авторизации
+        // Например: window.location.href = '/dashboard';
+        
+      } else {
+        setError(`❌ Ошибка: ${result.error}`);
+        setStatus('');
+      }
+      
+    } catch (error) {
+      console.error('Ошибка в процессе авторизации:', error);
+      setError(`❌ Ошибка: ${error.message}`);
+      setStatus('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGitClick = () => {
-    console.log('Нажата кнопка GitHub');
+    // Добавляем параметр type в URL
+    const url = new URL(window.location.href);
+    url.searchParams.set('type', 'github');
+    window.history.pushState({}, '', url);
+    
+    // Запускаем процесс авторизации
+    handleAuthFlow('github');
   };
 
   const handleCodeClick = () => {
-    console.log('Нажата кнопка Code Authentication');
+    const url = new URL(window.location.href);
+    url.searchParams.set('type', 'code');
+    window.history.pushState({}, '', url);
+    
+    handleAuthFlow('code');
   };
 
   const handleYandexClick = () => {
-    console.log('Нажата кнопка Yandex');
+    const url = new URL(window.location.href);
+    url.searchParams.set('type', 'yandex');
+    window.history.pushState({}, '', url);
+    
+    handleAuthFlow('yandex');
   };
 
   return (
     <Body>
-      <Title>
-        Вход в систему
-      </Title>
+      <Title>Вход в систему</Title>
       
       <DivBlockButton>
-        <Button onClick={handleGitClick} title="Войти через GitHub">
-          <IconImage 
-            src={gitIcon} 
-            alt="GitHub"
-          />
+        <Button onClick={handleGitClick} title="GitHub" disabled={loading}>
+          <IconImage src={gitIcon} alt="GitHub" />
         </Button>
         
-        <Button onClick={handleCodeClick} title="Войти по коду">
-          <IconImage 
-            src={codeIcon} 
-            alt="Code Authentication"
-          />
+        <Button onClick={handleCodeClick} title="Code Auth" disabled={loading}>
+          <IconImage src={codeIcon} alt="Code Auth" />
         </Button>
         
-        <Button onClick={handleYandexClick} title="Войти через Яндекс">
-          <IconImage 
-            src={yandexIcon} 
-            alt="Yandex"
-          />
+        <Button onClick={handleYandexClick} title="Yandex" disabled={loading}>
+          <IconImage src={yandexIcon} alt="Yandex" />
         </Button>
       </DivBlockButton>
       
