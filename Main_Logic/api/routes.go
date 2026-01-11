@@ -31,4 +31,11 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students", handlers.GetDisciplineStudentsHandler).Methods("GET")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students/{userID:[0-9]+}", handlers.AddStudentHandler).Methods("POST")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students/{userID:[0-9]+}", handlers.RemoveStudentHandler).Methods("DELETE")
+
+	// Users
+	api.HandleFunc("users/{id:[0-9]+}", handlers.GetUserInfoHandler).Methods("GET")
+	api.HandleFunc("users/{id:[0-9]+}/roles", handlers.GetUserRolesHandler).Methods("GET")
+	api.HandleFunc("users/{id:[0-9]+}/roles", handlers.UpdateUserRolesHandler).Methods("PUT")
+	api.HandleFunc("users/{id:[0-9]+}/state", handlers.IsUserBlockedHandler).Methods("GET")
+	api.HandleFunc("users/{id:[0-9]+}/state", handlers.ChangeBlockStatusHandler).Methods("PUT")
 }
