@@ -14,7 +14,7 @@ async def unknown_cmd_login(message: types.Message):
         if message.text.startswith('/login'):
             parts = message.text.split()
             if len(parts) == 1:
-                await message.answer('Выберите способ авторизации',reply_markup=kb.main)
+                await message.answer('вы не авторизованны, выберите способ авторизации',reply_markup=kb.main)
             else:
                 # С параметром type
                 auth_type = parts[1]

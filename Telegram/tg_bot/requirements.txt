@@ -1,4 +1,6 @@
 aiogram==3.0.0
 python-dotenv==1.0.0
 redis==5.0.1
-RUN pip install mypy pyright
+aiohttp==3.9.1 
+fastapi==0.104.1
+uvicorn==0.24.0  
