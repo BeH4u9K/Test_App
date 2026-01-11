@@ -8,6 +8,23 @@ import (
 
 func RegisterRoutes(r *mux.Router) {
 	api := r.PathPrefix("/api/v1").Subrouter()
-	api.HandleFunc("/disciplines", handlers.GetAllDisciplinesHandler).Methods("GET")
+
+	// Disciplines
+	api.HandleFunc("/disciplines", handlers.ListDisciplinesHandler).Methods("GET")
+	api.HandleFunc("/disciplines", handlers.CreateDisciplineHandler).Methods("POST")
 	api.HandleFunc("/disciplines/{id:[0-9]+}", handlers.GetDisciplineHandler).Methods("GET")
+	api.HandleFunc("/disciplines/{id:[0-9]+}", handlers.UpdateDisciplineHandler).Methods("PUT")
+	api.HandleFunc("/disciplines/{id:[0-9]+}", handlers.DeleteDisciplineHandler).Methods("DELETE")
+
+	// Tests
+	api.HandleFunc("/disciplines/{id:[0-9]+}/tests", handlers.GetDisciplineTestsHandler).Methods("GET")
+	api.HandleFunc("/disciplines/{id:[0-9]+}/tests", handlers.CreateTestHandler).Methods("POST")
+	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.GetTestStateHandler).Methods("GET")
+	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.UpdateTestStateHandler).Methods("PUT")
+	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.DeleteTestHandler).Methods("DELETE")
+
+	// Students
+	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students", handlers.GetDisciplineStudentsHandler).Methods("GET")
+	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students/{userID:[0-9]+}", handlers.AddStudentHandler).Methods("POST")
+	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students/{userID:[0-9]+}", handlers.RemoveStudentHandler).Methods("DELETE")
 }
