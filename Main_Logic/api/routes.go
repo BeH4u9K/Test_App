@@ -2,12 +2,16 @@ package api
 
 import (
 	"main_logic/api/handlers"
+	"main_logic/api/middleware"
 
 	"github.com/gorilla/mux"
 )
 
 func RegisterRoutes(r *mux.Router) {
 	api := r.PathPrefix("/api/v1").Subrouter()
+
+	// Middleware
+	api.Use(middleware.ValidateStringsMiddleware)
 
 	// Disciplines
 	api.HandleFunc("/disciplines", handlers.ListDisciplinesHandler).Methods("GET")

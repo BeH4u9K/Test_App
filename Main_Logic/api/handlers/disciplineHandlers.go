@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"main_logic/core"
 	"net/http"
@@ -18,6 +19,29 @@ type ErrorResponse struct {
 
 type IDResponse struct {
 	ID int `json:"id"`
+}
+
+// Helper функции для валидации
+func writeValidationError(w http.ResponseWriter, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(ErrorResponse{Error: msg})
+}
+
+func requireNonEmpty(w http.ResponseWriter, fieldName, value string) bool {
+	if value == "" {
+		writeValidationError(w, fmt.Sprintf("%s cannot be empty", fieldName))
+		return false
+	}
+	return true
+}
+
+func requirePositive(w http.ResponseWriter, fieldName string, value int) bool {
+	if value <= 0 {
+		writeValidationError(w, fmt.Sprintf("%s must be greater than 0", fieldName))
+		return false
+	}
+	return true
 }
 
 // Disciplines
@@ -69,9 +93,18 @@ func CreateDisciplineHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("ERROR: Failed to decode request: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		writeValidationError(w, "Invalid request body")
+		return
+	}
+
+	// Валидация обязательных полей
+	if !requireNonEmpty(w, "name", req.Name) {
+		return
+	}
+	if !requireNonEmpty(w, "description", req.Description) {
+		return
+	}
+	if !requirePositive(w, "teacher_id", req.TeacherID) {
 		return
 	}
 
@@ -104,9 +137,13 @@ func UpdateDisciplineHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("ERROR: Failed to decode request: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		writeValidationError(w, "Invalid request body")
+		return
+	}
+
+	// Валидация: хотя бы одно поле должно быть заполнено
+	if req.Name == "" || req.Description == "" {
+		writeValidationError(w, "name or description must be provided")
 		return
 	}
 
@@ -206,18 +243,22 @@ func UpdateTestStateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s (disciplineID=%d, testID=%d)", r.Method, r.URL.Path, discID, testID)
 
 	var req struct {
-		IsActive bool `json:"is_active"`
+		IsActive *bool `json:"is_active"` // pointer для отличия от false
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("ERROR: Failed to decode request: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		writeValidationError(w, "Invalid request body")
 		return
 	}
 
-	err = core.ChangeTestState(req.IsActive, discID, testID)
+	// Валидация: is_active обязателен
+	if req.IsActive == nil {
+		writeValidationError(w, "is_active is required")
+		return
+	}
+
+	err = core.ChangeTestState(*req.IsActive, discID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -242,9 +283,12 @@ func CreateTestHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("ERROR: Failed to decode request: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid request body"})
+		writeValidationError(w, "Invalid request body")
+		return
+	}
+
+	// Валидация: name обязателен и не может быть пуст
+	if !requireNonEmpty(w, "name", req.Name) {
 		return
 	}
 

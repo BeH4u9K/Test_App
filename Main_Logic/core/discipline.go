@@ -81,6 +81,11 @@ func GetDisciplineByID(id int) (DisciplineDTO, error) {
 }
 
 func ChangeDiscInfo(id int, newName string, newDescription string) error {
+
+	if newName == "" || newDescription == "" {
+		return fmt.Errorf("name or description can't be empty")
+	}
+
 	var isDeleted bool
 	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
 	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
@@ -181,6 +186,11 @@ func ChangeTestState(newStatus bool, disciplineID, testID int) error {
 }
 
 func AddTest(disciplineID int, name string) (int, error) {
+
+	if name == "" {
+		return 0, fmt.Errorf("Name can't be empty")
+	}
+
 	exists, _ := disciplineExists(disciplineID)
 	if !exists {
 		return 0, fmt.Errorf("discipline with id %d not found", disciplineID)
@@ -390,6 +400,12 @@ func DeleteDiscipline(disciplineID int) error {
 	_, err = storage.DB.Exec(queryTest, disciplineID)
 	if err != nil {
 		return fmt.Errorf("failed to delete tests: %v", err)
+	}
+
+	queryUsers := "DELETE FROM user_discipline WHERE discipline_id = $1"
+	_, err = storage.DB.Exec(queryUsers, disciplineID)
+	if err != nil {
+		return fmt.Errorf("failed to delete relations of users and disciplines: %v", err)
 	}
 
 	return nil
