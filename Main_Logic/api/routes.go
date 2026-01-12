@@ -31,11 +31,21 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students", handlers.GetDisciplineStudentsHandler).Methods("GET")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students/{userID:[0-9]+}", handlers.AddStudentHandler).Methods("POST")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/students/{userID:[0-9]+}", handlers.RemoveStudentHandler).Methods("DELETE")
+	api.HandleFunc("/tests/{id:[0-9]+}/passers", handlers.GetTestPassersHandler).Methods("GET")
+	api.HandleFunc("/tests/{id:[0-9]+/passers/marks}", handlers.GetUserMarksHandler).Methods("GET")
 
 	// Users
-	api.HandleFunc("users/{id:[0-9]+}", handlers.GetUserInfoHandler).Methods("GET")
-	api.HandleFunc("users/{id:[0-9]+}/roles", handlers.GetUserRolesHandler).Methods("GET")
-	api.HandleFunc("users/{id:[0-9]+}/roles", handlers.UpdateUserRolesHandler).Methods("PUT")
-	api.HandleFunc("users/{id:[0-9]+}/state", handlers.IsUserBlockedHandler).Methods("GET")
-	api.HandleFunc("users/{id:[0-9]+}/state", handlers.ChangeBlockStatusHandler).Methods("PUT")
+	api.HandleFunc("/users/{id:[0-9]+}", handlers.GetUserInfoHandler).Methods("GET")
+	api.HandleFunc("/users/{id:[0-9]+}/roles", handlers.GetUserRolesHandler).Methods("GET")
+	api.HandleFunc("/users/{id:[0-9]+}/roles", handlers.UpdateUserRolesHandler).Methods("PUT")
+	api.HandleFunc("/users/{id:[0-9]+}/state", handlers.IsUserBlockedHandler).Methods("GET")
+	api.HandleFunc("/users/{id:[0-9]+}/state", handlers.ChangeBlockStatusHandler).Methods("PUT")
+	api.HandleFunc("/users", handlers.RegisterUserHandler).Methods("POST")
+
+	// Questions
+	api.HandleFunc("/tests/{id:[0-9]+}", handlers.RemoveQuestionHandler).Methods("DELETE")
+	api.HandleFunc("/tests/{id:[0-9]+}", handlers.AddQuestionHandler).Methods("POST")
+	api.HandleFunc("/tests/{id:[0-9]+}", handlers.ReorderQuestionsHandler).Methods("PUT")
+	api.HandleFunc("/tests/{id:[0-9]+}/passers/attempts", handlers.CheckUserAnswersHandler).Methods("GET")
+
 }
