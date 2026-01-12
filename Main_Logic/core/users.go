@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/mail"
 
 	"main_logic/storage"
 )
@@ -24,12 +25,43 @@ type UserDiscipline struct {
 	Tests []UserTest
 }
 
+// Ошибки связанные с регистрацией
+var (
+	ErrInvalidEmail  = fmt.Errorf("invalid email")
+	ErrEmptyFullName = fmt.Errorf("empty full name")
+	ErrEmailExists   = fmt.Errorf("email already exists")
+)
+
 // UserData содержит полную информацию о пользователе (курсы, тесты, оценки)
 type UserData struct {
 	Disciplines []UserDiscipline
 }
 
+// Вспомогательная ф-ция для валидации почты
+func isValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
 // ============================================================================
+
+func RegisterUser(email string, fullName string) (int, error) {
+	if !isValidEmail(email) {
+		return 0, ErrInvalidEmail
+	}
+	if fullName == "" {
+		return 0, ErrEmptyFullName
+	}
+
+	var id int
+	query := "INSERT INTO users(email, full_name) VALUES($1, $2) RETURNING id"
+	err := storage.DB.QueryRow(query, email, fullName).Scan(&id)
+	if err != nil {
+		return 0, ErrEmailExists
+	}
+
+	return id, nil
+}
 
 // GetUserData возвращает информацию о пользователе (курсы, тесты, оценки)
 func GetUserData(id int) (UserData, error) {

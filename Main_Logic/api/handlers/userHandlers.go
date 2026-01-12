@@ -8,6 +8,54 @@ import (
 )
 
 // Users
+
+func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("Request: %s %s", r.Method, r.URL.Path)
+
+	var req struct {
+		Email    string `json:"email"`
+		FullName string `json:"full_name"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("ERROR: Failed to decode request: %v", err)
+		writeValidationError(w, "Invalid request body")
+		return
+	}
+
+	if !requireNonEmpty(w, "email", req.Email) {
+		return
+	}
+	if !requireNonEmpty(w, "full_name", req.FullName) {
+		return
+	}
+
+	id, err := core.RegisterUser(req.Email, req.FullName)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+
+		switch err {
+		case core.ErrInvalidEmail, core.ErrEmptyFullName:
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		case core.ErrEmailExists:
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "email already exists"})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "internal server error"})
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(IDResponse{ID: id})
+}
+
 func GetUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := GetIDFromVars(w, r, "id")
 	if err != nil {
