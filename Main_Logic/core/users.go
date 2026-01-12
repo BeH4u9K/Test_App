@@ -45,6 +45,19 @@ func isValidEmail(email string) bool {
 
 // ============================================================================
 
+func GetFullName(id int) (string, error) {
+	query := "SELECT full_name FROM users WHERE id = $1"
+
+	var res string
+
+	if err := storage.DB.QueryRow(query, id).Scan(&res); err != nil {
+		return "", fmt.Errorf("scan error: %v", err)
+	}
+
+	return res, nil
+
+}
+
 func RegisterUser(email string, fullName string) (int, error) {
 	if !isValidEmail(email) {
 		return 0, ErrInvalidEmail
