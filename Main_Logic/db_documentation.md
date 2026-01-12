@@ -150,7 +150,8 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     full_name VARCHAR(150) NOT NULL,
     is_blocked BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT NOW()
+    created_at TIMESTAMP DEFAULT NOW(),
+    email VARCHAR(150) NOT NULL UNIQUE
 );
 ```
 
@@ -161,6 +162,8 @@ CREATE TABLE users (
 - `is_blocked` — может ли пользователь пользоваться системой.
     
 - `created_at` — дата регистрации.
+
+- `email` - почта Ы
     
 
 **Логика:**
