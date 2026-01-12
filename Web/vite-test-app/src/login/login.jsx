@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { styled } from '@mui/system';
 import gitIcon from '../IMG/git.png';
 import codeIcon from '../IMG/code.png';
@@ -105,7 +105,7 @@ const LoadingSpinner = styled('div')({
   }
 });
 
-// Функция для генерации токенов
+// 📌 Генерация токена
 const generateToken = () => {
   const array = new Uint8Array(32);
   window.crypto.getRandomValues(array);
@@ -115,40 +115,30 @@ const generateToken = () => {
     .replace(/=+$/, '');
 };
 
-// Функция для установки куки
-const setCookie = (name, value, days = 7) => {
-  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${name}=${value}; expires=${expires}; path=/; HttpOnly; SameSite=Strict`;
-};
-
-// Функция для отправки запроса на сервер
-const sendAuthRequest = async (authUrl) => {
+// 📌 Отправка токена на сервер
+const sendTokenToServer = async (token, provider) => {
   try {
-    console.log('Отправляю запрос на сервер:', authUrl);
+    console.log(`🔄 [${provider}] Отправляю токен на сервер...`);
+    console.log(`📤 [${provider}] Токен:`, token.substring(0, 20) + '...');
     
-    const response = await fetch(authUrl, {
-      method: 'GET',
+    const response = await fetch('http://localhost:3001/api/token', {
+      method: 'POST',
       headers: {
-        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      mode: 'cors',
+      body: JSON.stringify({
+        token: token,
+        provider: provider
+      }),
     });
-
-    console.log('Статус ответа:', response.status);
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ошибка! Статус: ${response.status}, Текст: ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('Ответ от сервера:', data);
+    const result = await response.text();
+    console.log(`📥 [${provider}] Ответ сервера:`, result);
     
-    return { success: true, data };
+    return { success: true, message: result };
     
   } catch (error) {
-    console.error('Ошибка при отправке запроса:', error);
+    console.error(`❌ [${provider}] Ошибка отправки:`, error);
     return { success: false, error: error.message };
   }
 };
@@ -156,103 +146,56 @@ const sendAuthRequest = async (authUrl) => {
 function Login() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
+  const [activeProvider, setActiveProvider] = useState('');
 
-  // Проверяем параметры URL при загрузке
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const type = params.get('type');
-    
-    if (type && ['github', 'code', 'yandex'].includes(type)) {
-      handleAuthFlow(type);
-    }
-  }, []);
-
-  // Основная функция для обработки авторизации
-  const handleAuthFlow = async (provider) => {
+  const handleButtonClick = async (provider) => {
+    console.log(`🎯 Нажата кнопка: ${provider}`);
+    setActiveProvider(provider);
     setLoading(true);
-    setStatus(`Начинаем авторизацию через ${provider}...`);
-    setError('');
+    setStatus(`Отправка токена для ${provider}...`);
 
     try {
-      // 1. Генерируем токены
-      const sessionToken = generateToken();
-      const loginToken = generateToken();
+      // 1. Генерируем токен
+      const token = generateToken();
+      console.log(`🔑 [${provider}] Сгенерирован токен:`, token.substring(0, 20) + '...');
       
-      // 2. Устанавливаем куку
-      setCookie('session', sessionToken, 1);
-      
-      // 3. Выводим в консоль для отладки
-      console.log(`${provider} | Session: ${sessionToken} | Login: ${loginToken}`);
-      
-      // 4. Формируем URL для модуля авторизации
-      let authUrl;
-      
-      switch(provider.toLowerCase()) {
-        case 'github':
-          authUrl = `http://localhost:8080/auth?type=github&state=${loginToken}`;
-          break;
-        case 'yandex':
-          authUrl = `http://localhost:8080/auth?type=yandex&state=${loginToken}`;
-          break;
-        case 'code':
-          authUrl = `http://localhost:8080/auth?type=code&state=${loginToken}`;
-          break;
-        default:
-          throw new Error(`Неизвестный провайдер: ${provider}`);
-      }
-      
-      setStatus(`Отправляем запрос на сервер...`);
-      
-      // 5. Отправляем запрос на сервер
-      const result = await sendAuthRequest(authUrl);
+      // 2. Отправляем на сервер
+      const result = await sendTokenToServer(token, provider);
       
       if (result.success) {
-        setStatus(`✅ Авторизация через ${provider} успешно инициирована!`);
-        console.log('Токен сессии установлен:', sessionToken);
-        console.log('Токен входа отправлен:', loginToken);
-        
-        // Здесь можно добавить редирект или другие действия после успешной авторизации
-        // Например: window.location.href = '/dashboard';
-        
+        setStatus(`✅ Токен для ${provider} отправлен на сервер!`);
+        console.log(`✅ [${provider}] Успешно отправлено`);
       } else {
-        setError(`❌ Ошибка: ${result.error}`);
-        setStatus('');
+        setStatus(`❌ Ошибка для ${provider}: ${result.error}`);
+        console.error(`❌ [${provider}] Ошибка:`, result.error);
       }
       
     } catch (error) {
-      console.error('Ошибка в процессе авторизации:', error);
-      setError(`❌ Ошибка: ${error.message}`);
-      setStatus('');
+      console.error(`🔥 [${provider}] Критическая ошибка:`, error);
+      setStatus(`🔥 Критическая ошибка для ${provider}: ${error.message}`);
     } finally {
       setLoading(false);
+      // Очищаем статус через 3 секунды
+      setTimeout(() => {
+        setStatus('');
+        setActiveProvider('');
+      }, 3000);
     }
   };
 
   const handleGitClick = () => {
-    // Добавляем параметр type в URL
-    const url = new URL(window.location.href);
-    url.searchParams.set('type', 'github');
-    window.history.pushState({}, '', url);
-    
-    // Запускаем процесс авторизации
-    handleAuthFlow('github');
+    console.log('👉 Нажата кнопка GitHub');
+    handleButtonClick('github');
   };
 
   const handleCodeClick = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('type', 'code');
-    window.history.pushState({}, '', url);
-    
-    handleAuthFlow('code');
+    console.log('👉 Нажата кнопка Code Auth');
+    handleButtonClick('code');
   };
 
   const handleYandexClick = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('type', 'yandex');
-    window.history.pushState({}, '', url);
-    
-    handleAuthFlow('yandex');
+    console.log('👉 Нажата кнопка Yandex');
+    handleButtonClick('yandex');
   };
 
   return (
@@ -260,15 +203,30 @@ function Login() {
       <Title>Вход в систему</Title>
       
       <DivBlockButton>
-        <Button onClick={handleGitClick} title="GitHub" disabled={loading}>
+        <Button 
+          onClick={handleGitClick} 
+          title="GitHub" 
+          disabled={loading}
+          style={loading && activeProvider !== 'github' ? { opacity: 0.3 } : {}}
+        >
           <IconImage src={gitIcon} alt="GitHub" />
         </Button>
         
-        <Button onClick={handleCodeClick} title="Code Auth" disabled={loading}>
+        <Button 
+          onClick={handleCodeClick} 
+          title="Code Auth" 
+          disabled={loading}
+          style={loading && activeProvider !== 'code' ? { opacity: 0.3 } : {}}
+        >
           <IconImage src={codeIcon} alt="Code Auth" />
         </Button>
         
-        <Button onClick={handleYandexClick} title="Yandex" disabled={loading}>
+        <Button 
+          onClick={handleYandexClick} 
+          title="Yandex" 
+          disabled={loading}
+          style={loading && activeProvider !== 'yandex' ? { opacity: 0.3 } : {}}
+        >
           <IconImage src={yandexIcon} alt="Yandex" />
         </Button>
       </DivBlockButton>
@@ -278,6 +236,7 @@ function Login() {
         <Label>Code Auth</Label>
         <Label>Яндекс</Label>
       </ButtonLabel>
+
     </Body>
   );
 }

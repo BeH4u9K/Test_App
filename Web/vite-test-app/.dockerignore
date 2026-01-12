@@ -1,4 +1,3 @@
-# .dockerignore
 node_modules
 npm-debug.log
 dist
@@ -9,3 +8,4 @@ README.md
 Dockerfile
 docker-compose.yml
 .dockerignore
+nginx/ssl/*  # если используете SSL

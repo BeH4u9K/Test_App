@@ -6,6 +6,7 @@ docker build -t vite-react-app .
 
 # Запуск контейнера
 docker run -p 5173:5173 -v $(pwd):/app -v /app/node_modules --name my-vite-app vite-react-app
+
 # Собрать и запустить
 docker-compose up --build
 
@@ -17,3 +18,5 @@ docker-compose down
 
 # Просмотр логов
 docker-compose logs -f
+
+redis-server  
