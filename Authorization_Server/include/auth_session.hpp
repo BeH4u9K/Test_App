@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <chrono>
+#include <optional>
 
 enum class AuthStatus {
     PENDING, // не получен
@@ -10,11 +11,16 @@ enum class AuthStatus {
 };
 
 struct AuthSession {
-    std::string state_token;
+    std::string state_token; // сгенерированный state для oauth
+    std::string login_token; // исходный токен входа от клиента
     std::chrono::system_clock::time_point created_at;
     std::chrono::system_clock::time_point expires_at;
     AuthStatus status;
     std::string provider; // github, yandex, code
+
+    std::optional<std::string> access_token;
+    std::optional<std::string> refresh_token;
+    std::optional<std::string> user_id;
     
     bool is_expired() const {
         return std::chrono::system_clock::now() > expires_at;
