@@ -78,7 +78,7 @@ func GetQuestions(testID int) ([]QuestionListItem, error) {
 
 // GetQuestion возвращает информацию о конкретной версии вопроса, включая все варианты ответов
 // Возвращает ошибку, если вопрос удалён
-func GetQuestion(questionID int, version int) (Question, error) {
+func GetQuestion(testID, questionID int, version int) (Question, error) {
 	var q Question
 	q.Answers = make([]AnswerOption, 0)
 
@@ -209,12 +209,12 @@ func UpdateQuestion(rootID int, newTitle string, newText string, newAnswers []An
 }
 
 // DeleteQuestion помечает вопрос как удалённый
-func DeleteQuestion(questionID int) error {
+func DeleteQuestion(testID, questionID int) error {
 	var isActive bool
 	query := `SELECT t.is_active FROM test t 
               JOIN question q ON q.test_id = t.id 
-              WHERE q.id = $1`
-	err := storage.DB.QueryRow(query, questionID).Scan(&isActive)
+              WHERE q.id = $1 AND test_id = $2`
+	err := storage.DB.QueryRow(query, questionID, testID).Scan(&isActive)
 	if err == nil && isActive {
 		return fmt.Errorf("cannot delete question belonging to an active test")
 	}

@@ -47,5 +47,15 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/tests/{id:[0-9]+}", handlers.AddQuestionHandler).Methods("POST")
 	api.HandleFunc("/tests/{id:[0-9]+}", handlers.ReorderQuestionsHandler).Methods("PUT")
 	api.HandleFunc("/tests/{id:[0-9]+}/passers/attempts", handlers.CheckUserAnswersHandler).Methods("GET")
+	api.HandleFunc("/tests/{id:[0-9]+}/questions", handlers.GetQuestionsHandler).Methods("GET")
+	api.HandleFunc("/tests/{test_id:[0-9]+/questions/{question_id:[0-9]+}}", handlers.GetQuestionHandler).Methods("GET")
+	api.HandleFunc("/tests/{id:[0-9]+}/questions", handlers.CreateQuestionHandler).Methods("POST")
+	api.HandleFunc("/tests/{id:[0-9]+}/questions", handlers.UpdateQuestionHandler).Methods("PUT")
+	api.HandleFunc("/tests/{test_id:[0-9]+/questions/{question_id:[0-9]+}", handlers.DeleteQuestionHandler).Methods("DELETE")
+
+	// Attempts
+	api.HandleFunc("/users/{id:[0-9]+}/attempts", handlers.CreateAttemptHandler).Methods("POST")
+	api.HandleFunc("/users/{user_id:[0-9]+}/attempts/{attempt_id:[0-9]+}", handlers.CompleteAttemptHandler).Methods("PUT")
+	api.HandleFunc("/users/{user_id:[0-9]+}/attempts/{attempt_id:[0-9]+}", handlers.CheckAttemptHandler).Methods("GET")
 
 }
