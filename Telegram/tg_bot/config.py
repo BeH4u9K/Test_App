@@ -10,6 +10,6 @@ class Config:
     REDIS_PORT=int(os.getenv("REDIS_PORT",6379))
     REDIS_DB=int(os.getenv("REDIS_DB",0))
 
-    AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "")
+    AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8080")
 
 config = Config()

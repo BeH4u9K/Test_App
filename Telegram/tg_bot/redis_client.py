@@ -12,19 +12,26 @@ class RedisClient:
         )
     
     def get_user_data(self, chat_id: int) -> dict:
-        """Получить данные пользователя"""
+        """Получить данные пользователя из Redis"""
         key = f"user:{chat_id}"
         data = self.client.get(key)
         return json.loads(data) if data else None
     
     def set_login_data(self, chat_id: int, login_token: str):
-        """Сохранить токен входа и статус анонимный"""
+        """Сохранить токен входа в Redis"""
         data = {
             "status": "anonim",
             "login_token": login_token
         }
         key = f"user:{chat_id}"
         self.client.set(key, json.dumps(data))
+    
+    def ping(self) -> bool:
+        """Проверить подключение к Redis"""
+        try:
+            return self.client.ping()
+        except:
+            return False
 
-
+# Глобальный экземпляр
 redis_client = RedisClient()
