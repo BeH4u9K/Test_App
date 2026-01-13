@@ -3,7 +3,8 @@
 config.json
 secrets/
 __pycache__/
-*.pyc
+.pyc
+.pyo
 venv/
 env/
 *.db
@@ -14,4 +15,4 @@ user_data/
 *.log
 .vscode/
 .idea/
-*.pyc
+.rdb

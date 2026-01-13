@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Установка Python зависимостей
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Копирование всего кода
+COPY . .
+
+# Создание папки для логов
+RUN mkdir -p /app/logs
+
+CMD ["python", "main.py"]

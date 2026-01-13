@@ -3,6 +3,7 @@ package core
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"main_logic/storage"
 )
 
@@ -40,4 +41,13 @@ func hasAttempts(testID int) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+func GetTestIdByAttemptId(attemptID int) (int, error) {
+	var testID int
+	query := "SELECT test_id FROM attempt WHERE id = $1"
+	if err := storage.DB.QueryRow(query, attemptID).Scan(&testID); err != nil {
+		return 0, fmt.Errorf("Scan error: %v", err)
+	}
+	return testID, nil
 }
