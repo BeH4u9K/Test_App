@@ -60,39 +60,53 @@ void register_handlers(
         if (type == "github") {
             std::string redirect_uri;
             std::string client_id;
-            
-            if (config.contains("github") && 
-                config["github"].contains("client_id") && 
-                config["github"].contains("redirect_uri")) {
-                    redirect_uri = config["github"]["redirect_uri"].get<std::string>();
+
+            if (config.contains("github") && config["github"].is_object() && config["github"].contains("client_id") && 
+                config["github"]["client_id"].is_string() && !config["github"]["client_id"].get<std::string>().empty() &&
+                config["github"].contains("redirect_uri") && config["github"]["redirect_uri"].is_string() &&
+                !config["github"]["redirect_uri"].get<std::string>().empty()) {
                     client_id = config["github"]["client_id"].get<std::string>();
+                    redirect_uri = config["github"]["redirect_uri"].get<std::string>();
             } else {
-                client_id = "YOUR_GITHUB_CLIENT_ID";
-                redirect_uri = "http://localhost:8080/callback/github";
+                res.status = 500;
+                json error_response = {
+                    {"error", "GitHub OAuth not configured properly"},
+                    {"message", "Check your config/config.json file"}
+                };
+
+                res.set_content(error_response.dump(), "application/json");
+                return;
             }
             
-            std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id +
+            std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id + 
                 "&redirect_uri=" + redirect_uri + "&state=" + state_token + "&scope=user:email";
-            
+                
             response["auth_url"] = url;
-            
+
         } else if (type == "yandex") {
             std::string redirect_uri;
             std::string client_id;
             
-            if (config.contains("yandex") && 
-                config["yandex"].contains("client_id") && 
-                config["yandex"].contains("redirect_uri")) {
-                    redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
+            if (config.contains("yandex") && config["yandex"].is_object() && config["yandex"].contains("client_id") && 
+                config["yandex"]["client_id"].is_string() && !config["yandex"]["client_id"].get<std::string>().empty() &&
+                config["yandex"].contains("redirect_uri") && config["yandex"]["redirect_uri"].is_string() &&
+                !config["yandex"]["redirect_uri"].get<std::string>().empty()) {
                     client_id = config["yandex"]["client_id"].get<std::string>();
+                    redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
             } else {
-                client_id = "YOUR_YANDEX_CLIENT_ID";
-                redirect_uri = "http://localhost:8080/callback/yandex";
+                res.status = 500;
+                json error_response = {
+                    {"error", "Yandex OAuth not configured properly"},
+                    {"message", "Check your config/config.json file"}
+                };
+                
+                res.set_content(error_response.dump(), "application/json");
+                return;
             }
             
             std::string url = "https://oauth.yandex.ru/authorize?response_type=code" + std::string("&client_id=") + 
                 client_id + "&redirect_uri=" + redirect_uri + "&state=" + state_token;
-            
+                
             response["auth_url"] = url;
             
         } else if (type == "code") {
