@@ -103,21 +103,9 @@ int main() {
         set_cors_headers(res);
         res.status = 200;
     });
-    
-    // тестовый эндпоинт
-    svr.Get("/ping", [](const Request& req, Response& res) {
-        std::cout << "GET /ping - ping request received" << std::endl;
-
-        // CORS заголовки
-        set_cors_headers(res);
-
-        res.set_content("{\"message\": \"Hello World\"}", "application/json");
-    });
 
     // эндпоинт /auth - начало авторизации
     svr.Get("/auth", [](const Request& req, Response& res) {
-
-        // CORS заголовки
         set_cors_headers(res);
         
         std::string type = req.get_param_value("type");
@@ -127,7 +115,8 @@ int main() {
         
         if (type.empty() || login_token.empty()) {
             res.status = 400;
-            res.set_content("{\"error\":\"Missing parameters\"}", "application/json");
+            json error_response = {{"error", "Missing parameters"}};
+            res.set_content(error_response.dump(), "application/json");
             return;
         }
         
@@ -147,34 +136,49 @@ int main() {
         };
         
         session_storage.add_session(session);
-        std::cout << "Created session for login_token: " << login_token 
-                  << ", state_token: " << state_token << std::endl;
+        std::cout << "Created session - state_token: " << state_token << ", login_token: " << login_token << std::endl;
         
         json response;
+        response["state_token"] = state_token;
+        response["expires_at"] = std::chrono::duration_cast<std::chrono::seconds>(session.expires_at.time_since_epoch()).count();
         
         if (type == "github") {
-            std::string redirect_uri = config["github"]["redirect_uri"].get<std::string>();
-            std::string client_id = config["github"]["client_id"].get<std::string>();
-
+            std::string redirect_uri;
+            std::string client_id;
+            
+            if (config.contains("github") && 
+                config["github"].contains("client_id") && 
+                config["github"].contains("redirect_uri")) {
+                    redirect_uri = config["github"]["redirect_uri"].get<std::string>();
+                    client_id = config["github"]["client_id"].get<std::string>();
+            } else {
+                client_id = "YOUR_GITHUB_CLIENT_ID";
+                redirect_uri = "http://localhost:8080/callback/github";
+            }
+            
             std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id +
-                "&redirect_uri=" + redirect_uri + 
-                "&state=" + state_token +
-                "&scope=user:email";
+                "&redirect_uri=" + redirect_uri + "&state=" + state_token + "&scope=user:email";
             
             response["auth_url"] = url;
-            response["state_token"] = state_token;
-
+            
         } else if (type == "yandex") {
-            std::string redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
-            std::string client_id = config["yandex"]["client_id"].get<std::string>();
-
-            std::string url = "https://oauth.yandex.ru/authorize?response_type=code" +
-                std::string("&client_id=") + client_id +
-                "&redirect_uri=" + redirect_uri +
-                "&state=" + state_token;
+            std::string redirect_uri;
+            std::string client_id;
+            
+            if (config.contains("yandex") && 
+                config["yandex"].contains("client_id") && 
+                config["yandex"].contains("redirect_uri")) {
+                    redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
+                    client_id = config["yandex"]["client_id"].get<std::string>();
+            } else {
+                client_id = "YOUR_YANDEX_CLIENT_ID";
+                redirect_uri = "http://localhost:8080/callback/yandex";
+            }
+            
+            std::string url = "https://oauth.yandex.ru/authorize?response_type=code" + std::string("&client_id=") + 
+                client_id + "&redirect_uri=" + redirect_uri + "&state=" + state_token;
             
             response["auth_url"] = url;
-            response["state_token"] = state_token;
             
         } else if (type == "code") {
             std::random_device rd;
@@ -184,24 +188,23 @@ int main() {
             
             response["auth_type"] = "code";
             response["code"] = code;
-            response["state_token"] = state_token;
             response["message"] = "Enter this code in your authorized device";
             
         } else {
             res.status = 400;
-            res.set_content("{\"error\":\"Unsupported auth type. Use: github, yandex, code\"}", "application/json");
+            json error_response = {
+                {"error", "Unsupported auth type"},
+                {"supported_types", {"github", "yandex", "code"}}
+            };
+            res.set_content(error_response.dump(), "application/json");
             return;
         }
-        
-        response["expires_at"] = std::chrono::duration_cast<std::chrono::seconds>(session.expires_at.time_since_epoch()).count();
         
         res.set_content(response.dump(), "application/json");
     });
 
     // эндпоинт /check - проверка статуса авторизации
     svr.Get("/check", [](const Request& req, Response& res) {
-
-        // CORS заголовки
         set_cors_headers(res);
         
         std::string login_token = req.get_param_value("state");
@@ -410,37 +413,185 @@ int main() {
     
     // callback от yandex
     svr.Get("/callback/yandex", [](const Request& req, Response& res) {
-
-        // CORS заголовки
-        set_cors_headers(res);
-
         std::string code = req.get_param_value("code");
         std::string state = req.get_param_value("state");
+        std::string error = req.get_param_value("error");
         
         std::cout << "GET /callback/yandex - code: " << code 
-                  << ", state: " << state << std::endl;
+                  << ", state: " << state 
+                  << ", error: " << error << std::endl;
+
+        if (!error.empty()) {
+            std::cout << "Yandex returned error: " << error << std::endl;
+            
+            auto session_opt = session_storage.get_session_by_state(state);
+            if (session_opt) {
+                session_opt->status = AuthStatus::DENIED;
+                session_storage.update_session(*session_opt);
+            }
+            
+            res.set_content("<h1>Авторизация отменена</h1><p>Вы отказались от авторизации через Яндекс.</p><p>Закройте это окно и вернитесь в приложение.</p>", "text/html; charset=utf-8");
+            return;
+        }
         
-        res.set_content("{\"message\":\"Yandex callback\"}", "application/json");
+        if (code.empty() || state.empty()) {
+            res.set_content("<h1>Ошибка</h1><p>Отсутствуют необходимые параметры.</p>", "text/html; charset=utf-8");
+            return;
+        }
+
+        auto session_opt = session_storage.get_session_by_state(state);
+        if (!session_opt) {
+            res.set_content("<h1>Ошибка</h1><p>Сессия не найдена или истекла.</p>", "text/html; charset=utf-8");
+            return;
+        }
+        
+        AuthSession session = *session_opt;
+
+        std::string client_id = config["yandex"]["client_id"].get<std::string>();
+        std::string client_secret = config["yandex"]["client_secret"].get<std::string>();
+
+        std::string post_body = "grant_type=authorization_code" +
+                               std::string("&code=") + code +
+                               "&client_id=" + client_id +
+                               "&client_secret=" + client_secret;
+        
+        auto token_response = http_post("https://oauth.yandex.ru", "/token", post_body);
+        if (!token_response) {
+            std::cerr << "Failed to exchange code for Yandex token" << std::endl;
+            res.set_content("<h1>Ошибка сервера</h1><p>Не удалось получить токен от Яндекс.</p>", "text/html; charset=utf-8");
+            return;
+        }
+        
+        try {
+            json token_data = json::parse(*token_response);
+
+            if (!token_data.contains("access_token") || token_data["access_token"].is_null()) {
+                throw std::runtime_error("Не удалось получить access_token от Яндекс");
+            }
+            
+            std::string access_token = token_data["access_token"].get<std::string>();
+
+            httplib::Client cli("https://login.yandex.ru");
+            cli.set_connection_timeout(5);
+            cli.set_read_timeout(5);
+
+            httplib::Headers headers = {
+                {"Authorization", "OAuth " + access_token}
+            };
+            
+            auto user_res = cli.Get("/info?format=json", headers);
+            if (!user_res || user_res->status != 200) {
+                throw std::runtime_error("Не удалось получить данные пользователя от Яндекс");
+            }
+            
+            json user_data = json::parse(user_res->body);
+
+            if (!user_data.contains("default_email") || user_data["default_email"].is_null()) {
+                throw std::runtime_error("Не удалось получить email пользователя от Яндекс");
+            }
+            
+            std::string email = user_data["default_email"].get<std::string>();
+            std::cout << "Yandex user email: " << email << std::endl;
+            
+            // mongodb
+
+            std::string user_id = "user_" + email.substr(0, email.find('@'));
+            
+            // jwt токены
+
+            std::string jwt_access_token = "yandex_access_" + generate_state_token();
+            std::string jwt_refresh_token = "yandex_refresh_" + generate_state_token();
+            
+            session.status = AuthStatus::GRANTED;
+            session.access_token = jwt_access_token;
+            session.refresh_token = jwt_refresh_token;
+            session.user_id = user_id;
+            session_storage.update_session(session);
+            
+            std::cout << "Authorization granted for user: " << user_id 
+                      << ", login_token: " << session.login_token << std::endl;
+            
+            res.set_content("<h1>Успешная авторизация!</h1><p>Вы успешно авторизовались через Яндекс.</p><p>Закройте это окно и вернитесь в приложение.</p>", "text/html; charset=utf-8");
+            
+        } catch (const std::exception& e) {
+            std::cerr << "Error processing Yandex response: " << e.what() << std::endl;
+            res.set_content("<h1>Ошибка</h1><p>Ошибка обработки данных пользователя: " + std::string(e.what()) + "</p>", "text/html; charset=utf-8");
+            return;
+        }
     });
     
     // обновление токенов
     svr.Post("/refresh", [](const Request& req, Response& res) {
-
-        // CORS заголовки
         set_cors_headers(res);
+        
+        try {
+            json body = json::parse(req.body);
+            std::string refresh_token = body.value("refresh_token", "");
+            
+            if (refresh_token.empty()) {
+                res.status = 400;
+                res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
+                return;
+            }
+            
+            std::cout << "POST /refresh - refresh_token: " << refresh_token << std::endl;
 
-        std::cout << "POST /refresh - body: " << req.body << std::endl;
-        res.set_content("{\"message\":\"Refresh endpoint\"}", "application/json");
+            if (refresh_token.find("_refresh_") == std::string::npos) {
+                res.status = 401;
+                res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
+                return;
+            }
+
+            std::string user_id = "user_example";
+
+            std::string new_access_token = "new_access_" + generate_state_token();
+            std::string new_refresh_token = "new_refresh_" + generate_state_token();
+            
+            json response = {
+                {"access_token", new_access_token},
+                {"refresh_token", new_refresh_token}
+            };
+            
+            res.set_content(response.dump(), "application/json");
+            
+        } catch (const json::exception& e) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Invalid JSON format\"}", "application/json");
+        }
     });
     
     // выход из системы
     svr.Post("/logout", [](const Request& req, Response& res) {
-
-        // CORS заголовки
         set_cors_headers(res);
-
-        std::cout << "POST /logout - body: " << req.body << std::endl;
-        res.set_content("{\"message\":\"Logout endpoint\"}", "application/json");
+        
+        try {
+            json body = json::parse(req.body);
+            std::string refresh_token = body.value("refresh_token", "");
+            
+            if (refresh_token.empty()) {
+                res.status = 400;
+                res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
+                return;
+            }
+            
+            std::cout << "POST /logout - refresh_token: " << refresh_token << std::endl;
+            
+            if (refresh_token.find("_refresh_") == std::string::npos) {
+                res.status = 401;
+                res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
+                return;
+            }
+            
+            json response = {
+                {"message", "Logged out successfully"}
+            };
+            
+            res.set_content(response.dump(), "application/json");
+            
+        } catch (const json::exception& e) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Invalid JSON format\"}", "application/json");
+        }
     });
     
     svr.listen(host.c_str(), port);
