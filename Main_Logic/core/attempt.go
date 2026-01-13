@@ -66,8 +66,13 @@ func CreateAttempt(userID int, testID int) (int, error) {
 func CompleteAttempt(userID, attemptID int) error {
 	var testID int
 	var status string
-	if err := storage.DB.QueryRow("SELECT test_id, status FROM attempt WHERE id = $1", attemptID).Scan(&testID, &status); err != nil {
-		return fmt.Errorf("attempt not found")
+	// Проверяем, что попытка принадлежит userID
+	err := storage.DB.QueryRow(
+		"SELECT test_id, status FROM attempt WHERE id = $1 AND user_id = $2",
+		attemptID, userID,
+	).Scan(&testID, &status)
+	if err != nil {
+		return fmt.Errorf("attempt not found for user %d", userID)
 	}
 
 	if status != "in_progress" {
@@ -75,12 +80,18 @@ func CompleteAttempt(userID, attemptID int) error {
 	}
 
 	var totalQuestions int
-	_ = storage.DB.QueryRow("SELECT COUNT(*) FROM question WHERE test_id = $1 AND is_deleted = FALSE", testID).Scan(&totalQuestions)
+	_ = storage.DB.QueryRow(
+		"SELECT COUNT(*) FROM question WHERE test_id = $1 AND is_deleted = FALSE",
+		testID,
+	).Scan(&totalQuestions)
 	if totalQuestions == 0 {
 		return fmt.Errorf("test has no questions")
 	}
 
-	rows, err := storage.DB.Query("SELECT answer_option_id FROM user_answer WHERE attempt_id = $1", attemptID)
+	rows, err := storage.DB.Query(
+		"SELECT answer_option_id FROM user_answer WHERE attempt_id = $1",
+		attemptID,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to get user answers: %v", err)
 	}
@@ -91,7 +102,10 @@ func CompleteAttempt(userID, attemptID int) error {
 		var optID int
 		_ = rows.Scan(&optID)
 		var isCorrect bool
-		_ = storage.DB.QueryRow("SELECT is_correct FROM answer_option WHERE id = $1", optID).Scan(&isCorrect)
+		_ = storage.DB.QueryRow(
+			"SELECT is_correct FROM answer_option WHERE id = $1",
+			optID,
+		).Scan(&isCorrect)
 		if isCorrect {
 			correctAnswers++
 		}
@@ -99,8 +113,13 @@ func CompleteAttempt(userID, attemptID int) error {
 
 	score := (correctAnswers * 100) / totalQuestions
 
-	queryUpdate := "UPDATE attempt SET status = 'completed', score = $1, completed_at = NOW() WHERE id = $2"
-	_, err = storage.DB.Exec(queryUpdate, score, attemptID)
+	// Обновляем конкретно попытку этого пользователя
+	queryUpdate := `
+        UPDATE attempt
+        SET status = 'completed', score = $1, completed_at = NOW()
+        WHERE id = $2 AND user_id = $3
+    `
+	_, err = storage.DB.Exec(queryUpdate, score, attemptID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to finalize attempt: %v", err)
 	}
