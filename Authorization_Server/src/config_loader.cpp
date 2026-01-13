@@ -1,18 +1,33 @@
 #include "../include/config_loader.hpp"
 #include <fstream>
 #include <iostream>
+#include <filesystem>
 
 bool load_config(nlohmann::json& config) {
     try {
-        std::ifstream config_file("config/config.json");
+        std::vector<std::string> possible_paths = {
+            "config/config.json",
+            "../config/config.json",
+            "../../config/config.json",
+            "Authorization_Server/config/config.json"
+        };
+        
+        std::ifstream config_file;
+        
+        for (const auto& path : possible_paths) {
+            config_file.open(path);
+        }
+        
         if (!config_file.is_open()) {
-            std::cerr << "ERROR: Config file not found at config/config.json\n";
-            std::cerr << "Create it from config.example.json with real values:\n";
-            std::cerr << "1. Register OAuth app on GitHub: https://github.com/settings/developers\n";
-            std::cerr << "2. Register OAuth app on Yandex: https://oauth.yandex.ru/\n";
+            std::cerr << "ERROR: Config file not found. Tried:\n";
+            for (const auto& path : possible_paths) {
+                std::cerr << "  - " << path << "\n";
+            }
             return false;
         }
+        
         config_file >> config;
+        config_file.close();
 
         bool config_ok = true;
         

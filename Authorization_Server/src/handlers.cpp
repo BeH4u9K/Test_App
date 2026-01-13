@@ -23,41 +23,45 @@ void register_handlers(
     server.Get("/auth", [&](const Request& req, Response& res) {
         set_cors_headers(res);
         
-        std::string type = req.get_param_value("type");
-        std::string login_token = req.get_param_value("state");
+        std::string provider = req.get_param_value("provider");
+        std::string login_token = req.get_param_value("login_token");
         
-        std::cout << "GET /auth - type: " << type << ", login_token: " << login_token << std::endl;
+        std::cout << "GET /auth - provider: " << provider << ", login_token: " << login_token << std::endl;
         
-        if (type.empty() || login_token.empty()) {
+        if (provider.empty() || login_token.empty()) {
             res.status = 400;
-            json error_response = {{"error", "Missing parameters"}};
+            json error_response = {
+                {"error", "Missing parameters"},
+                {"required", {"provider", "login_token"}}
+            };
+
             res.set_content(error_response.dump(), "application/json");
             return;
         }
         
-        std::string state_token = generate_state_token();
+        std::string oauth_state = generate_state_token();
         auto now = std::chrono::system_clock::now();
         
         AuthSession session{
-            state_token,
             login_token,
+            oauth_state,
+            provider,
             now,
             now + std::chrono::minutes(5),
             AuthStatus::PENDING,
-            type,
             std::nullopt, // access_token
             std::nullopt, // refresh_token
             std::nullopt // user_id
         };
-        
+    
         session_storage.add_session(session);
-        std::cout << "Created session - state_token: " << state_token << ", login_token: " << login_token << std::endl;
+        std::cout << "Created session - login_token: " << login_token << ", oauth_state: " << oauth_state << std::endl;
         
         json response;
-        response["state_token"] = state_token;
+        response["oauth_state"] = oauth_state;
         response["expires_at"] = std::chrono::duration_cast<std::chrono::seconds>(session.expires_at.time_since_epoch()).count();
-        
-        if (type == "github") {
+
+        if (provider == "github") {
             std::string redirect_uri;
             std::string client_id;
 
@@ -79,11 +83,11 @@ void register_handlers(
             }
             
             std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id + 
-                "&redirect_uri=" + redirect_uri + "&state=" + state_token + "&scope=user:email";
+                "&redirect_uri=" + redirect_uri + "&state=" + oauth_state + "&scope=user:email";
                 
             response["auth_url"] = url;
 
-        } else if (type == "yandex") {
+        } else if (provider == "yandex") {
             std::string redirect_uri;
             std::string client_id;
             
@@ -105,11 +109,11 @@ void register_handlers(
             }
             
             std::string url = "https://oauth.yandex.ru/authorize?response_type=code" + std::string("&client_id=") + 
-                client_id + "&redirect_uri=" + redirect_uri + "&state=" + state_token;
+                client_id + "&redirect_uri=" + redirect_uri + "&state=" + oauth_state;
                 
             response["auth_url"] = url;
             
-        } else if (type == "code") {
+        } else if (provider == "code") {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<> dis(100000, 999999);
@@ -136,11 +140,11 @@ void register_handlers(
     server.Get("/check", [&](const Request& req, Response& res) {
         set_cors_headers(res);
         
-        std::string login_token = req.get_param_value("state");
+        std::string login_token = req.get_param_value("login_token");
         
         if (login_token.empty()) {
             res.status = 400;
-            res.set_content("{\"error\":\"Missing parameter: state\"}", "application/json");
+            res.set_content("{\"error\":\"Missing parameter: login_token\"}", "application/json");
             return;
         }
         
@@ -148,7 +152,7 @@ void register_handlers(
         if (!session_opt) {
             json response = {
                 {"status", "not_found"},
-                {"message", "Session not found or expired"}
+                {"message", "Session not found or already finalized"}
             };
             res.set_content(response.dump(), "application/json");
             return;
@@ -163,13 +167,15 @@ void register_handlers(
         
         json response = {
             {"status", ""},
-            {"state_token", session.state_token}
+            {"provider", session.provider}
         };
         
         switch (session.status) {
             case AuthStatus::PENDING:
                 response["status"] = "pending";
+                response["expires_in"] = std::chrono::duration_cast<std::chrono::seconds>(session.expires_at - std::chrono::system_clock::now()).count();
                 break;
+                
             case AuthStatus::GRANTED:
                 response["status"] = "granted";
                 if (session.access_token) {
@@ -181,17 +187,18 @@ void register_handlers(
                 if (session.user_id) {
                     response["user_id"] = *session.user_id;
                 }
+                session_storage.remove_session_by_login(login_token);
                 break;
+            
             case AuthStatus::DENIED:
                 response["status"] = "denied";
+                session_storage.remove_session_by_login(login_token);
                 break;
+            
             case AuthStatus::EXPIRED:
                 response["status"] = "expired";
+                session_storage.remove_session_by_login(login_token);
                 break;
-        }
-        
-        if (session.status != AuthStatus::PENDING && session.status != AuthStatus::GRANTED) {
-            session_storage.remove_session_by_login(login_token);
         }
         
         res.set_content(response.dump(), "application/json");

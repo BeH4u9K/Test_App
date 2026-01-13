@@ -12,17 +12,17 @@ void handle_github_callback(
     const json& config
 ) {
     std::string code = req.get_param_value("code");
-    std::string state = req.get_param_value("state");
+    std::string oauth_state = req.get_param_value("state");
     std::string error = req.get_param_value("error");
     std::string error_description = req.get_param_value("error_description");
         
-    std::cout << "GET /callback/github - code: " << code << ", state: " << state 
-        << ", error: " << error << ", error_desc: " << error_description << std::endl;
+    std::cout << "GET /callback/github - code: " << code << ", oauth_state: " << oauth_state 
+              << ", error: " << error << ", error_desc: " << error_description << std::endl;
         
     if (!error.empty()) {
         std::cout << "GitHub returned error: " << error_description << std::endl;
 
-        auto session_opt = storage.get_session_by_state(state);
+        auto session_opt = storage.get_session_by_oauth_state(oauth_state);
         if (session_opt) {
             session_opt->status = AuthStatus::DENIED;
             storage.update_session(*session_opt);
@@ -32,12 +32,12 @@ void handle_github_callback(
         return;
     }
         
-    if (code.empty() || state.empty()) {
+    if (code.empty() || oauth_state.empty()) {
         res.set_content("<h1>Ошибка</h1><p>Отсутствуют необходимые параметры.</p>", "text/html; charset=utf-8");
         return;
     }
         
-    auto session_opt = storage.get_session_by_state(state);
+    auto session_opt = storage.get_session_by_oauth_state(oauth_state);
     if (!session_opt) {
         res.set_content("<h1>Ошибка</h1><p>Сессия не найдена или истекла.</p>", "text/html; charset=utf-8");
         return;
@@ -121,9 +121,9 @@ void handle_github_callback(
             
         std::cout << "GitHub user email: " << email << std::endl;
             
-        // mongdb
+        // mongodb
 
-        std::string user_id = "user_" + email.substr(0, email.find('@'));
+        std::string user_id = "github_user_" + email.substr(0, email.find('@'));
             
         // jwt токены
 

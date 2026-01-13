@@ -12,15 +12,15 @@ void handle_yandex_callback(
     const json& config
 ) {
     std::string code = req.get_param_value("code");
-    std::string state = req.get_param_value("state");
+    std::string oauth_state = req.get_param_value("state");
     std::string error = req.get_param_value("error");
         
-    std::cout << "GET /callback/yandex - code: " << code << ", state: " << state << ", error: " << error << std::endl;
+    std::cout << "GET /callback/yandex - code: " << code << ", oauth_state: " << oauth_state << ", error: " << error << std::endl;
 
     if (!error.empty()) {
         std::cout << "Yandex returned error: " << error << std::endl;
             
-        auto session_opt = storage.get_session_by_state(state);
+        auto session_opt = storage.get_session_by_oauth_state(oauth_state);
         if (session_opt) {
             session_opt->status = AuthStatus::DENIED;
             storage.update_session(*session_opt);
@@ -30,12 +30,12 @@ void handle_yandex_callback(
         return;
     }
         
-    if (code.empty() || state.empty()) {
+    if (code.empty() || oauth_state.empty()) {
         res.set_content("<h1>Ошибка</h1><p>Отсутствуют необходимые параметры.</p>", "text/html; charset=utf-8");
         return;
     }
 
-    auto session_opt = storage.get_session_by_state(state);
+    auto session_opt = storage.get_session_by_oauth_state(oauth_state);
     if (!session_opt) {
         res.set_content("<h1>Ошибка</h1><p>Сессия не найдена или истекла.</p>", "text/html; charset=utf-8");
         return;
@@ -63,14 +63,14 @@ void handle_yandex_callback(
             throw std::runtime_error("Не удалось получить access_token от Яндекс");
         }
             
-        std::string access_token = token_data["access_token"].get<std::string>();
+        std::string yandex_access_token = token_data["access_token"].get<std::string>();
 
         httplib::Client cli("https://login.yandex.ru");
         cli.set_connection_timeout(5);
         cli.set_read_timeout(5);
 
         httplib::Headers headers = {
-            {"Authorization", "OAuth " + access_token}
+            {"Authorization", "OAuth " + yandex_access_token}
         };
             
         auto user_res = cli.Get("/info?format=json", headers);
@@ -89,7 +89,7 @@ void handle_yandex_callback(
             
         // mongodb
 
-        std::string user_id = "user_" + email.substr(0, email.find('@'));
+        std::string user_id = "yandex_user_" + email.substr(0, email.find('@'));
             
         // jwt токены
 

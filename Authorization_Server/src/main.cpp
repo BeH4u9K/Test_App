@@ -21,7 +21,7 @@ int main() {
 
     register_handlers(server, session_storage, config);
 
-    std::cout << "Authorization Server listening on " << host << ":" << port << "\n";
+    std::cout << "\nAuthorization Server listening on " << host << ":" << port << "\n";
 
     server.listen(host.c_str(), port);
     return 0;
