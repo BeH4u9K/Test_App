@@ -7,8 +7,8 @@ import (
 
 // Структуры
 type AttemptShort struct {
-	UserID int
-	Mark   int
+	UserID int `json:"user_id"`
+	Mark   int `json:"mark"`
 }
 
 type UserAnswer struct {

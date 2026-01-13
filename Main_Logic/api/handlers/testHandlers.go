@@ -8,7 +8,13 @@ import (
 )
 
 func RemoveQuestionHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -38,7 +44,13 @@ func RemoveQuestionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddQuestionHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -69,7 +81,12 @@ func AddQuestionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -101,7 +118,13 @@ func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	discID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -116,8 +139,10 @@ func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 		return
 	}
-
-	result := make([]string, 0)
+	type Name struct {
+		FullName string `json:"full_name"`
+	}
+	result := make([]Name, 0)
 
 	for _, v := range testIDs {
 		name, err := core.GetFullName(v)
@@ -128,7 +153,9 @@ func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 			return
 		}
-		result = append(result, name)
+		var n Name
+		n.FullName = name
+		result = append(result, n)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -136,7 +163,13 @@ func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUserMarksHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -156,7 +189,12 @@ func GetUserMarksHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CheckUserAnswersHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}

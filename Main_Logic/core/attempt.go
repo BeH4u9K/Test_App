@@ -63,31 +63,6 @@ func CreateAttempt(userID int, testID int) (int, error) {
 	return attemptID, nil
 }
 
-func UpdateAttemptAnswer(userID, testID, questionID, answerOptionID int) error {
-	var isTestActive bool
-	if err := storage.DB.QueryRow("SELECT is_active FROM test WHERE id = $1", testID).Scan(&isTestActive); err != nil || !isTestActive {
-		return fmt.Errorf("test is not active")
-	}
-
-	var attemptID int
-	var status string
-	queryAttempt := "SELECT id, status FROM attempt WHERE user_id = $1 AND test_id = $2"
-	if err := storage.DB.QueryRow(queryAttempt, userID, testID).Scan(&attemptID, &status); err != nil {
-		return fmt.Errorf("active attempt for user %d not found", userID)
-	}
-
-	if status != "in_progress" {
-		return fmt.Errorf("attempt is already finished")
-	}
-
-	updateQuery := "UPDATE user_answer SET answer_option_id = $1 WHERE attempt_id = $2 AND question_id = $3"
-	_, err := storage.DB.Exec(updateQuery, answerOptionID, attemptID, questionID)
-	if err != nil {
-		return fmt.Errorf("failed to update answer: %v", err)
-	}
-	return nil
-}
-
 func CompleteAttempt(userID, attemptID int) error {
 	var testID int
 	var status string
@@ -195,8 +170,4 @@ func CheckAttempt(userID, testID int) (AttemptCheckResult, error) {
 
 	res.Answers = answers
 	return res, nil
-}
-
-func DeleteAnswer(userID, testID, questionID int) error {
-	return UpdateAttemptAnswer(userID, testID, questionID, -1)
 }

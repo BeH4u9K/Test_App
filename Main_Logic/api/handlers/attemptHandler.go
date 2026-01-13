@@ -42,12 +42,12 @@ func CreateAttemptHandler(w http.ResponseWriter, r *http.Request) {
 
 func CompleteAttemptHandler(w http.ResponseWriter, r *http.Request) {
 
-	userID, err := GetIDFromVars(w, r, "attempt_id")
+	userID, err := GetIDFromVars(w, r, "userID")
 	if err != nil {
 		return
 	}
 
-	attemptID, err := GetIDFromVars(w, r, "attempt_id")
+	attemptID, err := GetIDFromVars(w, r, "attemptID")
 	if err != nil {
 		return
 	}
@@ -64,12 +64,12 @@ func CompleteAttemptHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CheckAttemptHandler(w http.ResponseWriter, r *http.Request) {
-	userID, err := GetIDFromVars(w, r, "attempt_id")
+	userID, err := GetIDFromVars(w, r, "userID")
 	if err != nil {
 		return
 	}
 
-	attemptID, err := GetIDFromVars(w, r, "attempt_id")
+	attemptID, err := GetIDFromVars(w, r, "attemptID")
 	if err != nil {
 		return
 	}
