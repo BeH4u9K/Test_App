@@ -30,7 +30,7 @@ func RemoveQuestionHandler(w http.ResponseWriter, r *http.Request) {
 		writeValidationError(w, "Invalid request body")
 		return
 	}
-	err = core.RemoveQuestionFromTest(testID, req.RootID)
+	err = core.RemoveQuestionFromTest(disciplineID, testID, req.RootID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -67,7 +67,7 @@ func AddQuestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = core.AddQuestionToTest(testID, req.RootID)
+	err = core.AddQuestionToTest(disciplineID, testID, req.RootID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -103,7 +103,7 @@ func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = core.ReorderQuestions(testID, req.NewOrder)
+	err = core.ReorderQuestions(disciplineID, testID, req.NewOrder)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -119,7 +119,7 @@ func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 
 func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 
-	discID, err := GetIDFromVars(w, r, "disciplineID")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
 	if err != nil {
 		return
 	}
@@ -131,7 +131,7 @@ func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 
 	testIDs := make([]int, 0)
 
-	testIDs, err = core.GetTestPassers(testID)
+	testIDs, err = core.GetTestPassers(disciplineID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -175,7 +175,7 @@ func GetUserMarksHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userMarks := make([]core.AttemptShort, 0)
-	userMarks, err = core.GetUserMarks(testID)
+	userMarks, err = core.GetUserMarks(disciplineID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -201,7 +201,7 @@ func CheckUserAnswersHandler(w http.ResponseWriter, r *http.Request) {
 
 	res := make([]core.UserAnswer, 0)
 
-	res, err = core.CheckUserAnswers(testID)
+	res, err = core.CheckUserAnswers(disciplineID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
