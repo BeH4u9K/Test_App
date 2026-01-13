@@ -1,2 +1,5 @@
-Telegram
-test
+Telegram bot
+#запуск:
+
+docker-compose up -d redis
+docker-compose up -d --build
