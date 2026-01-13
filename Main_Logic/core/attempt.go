@@ -88,7 +88,7 @@ func UpdateAttemptAnswer(userID, testID, questionID, answerOptionID int) error {
 	return nil
 }
 
-func CompleteAttempt(attemptID int) error {
+func CompleteAttempt(userID, attemptID int) error {
 	var testID int
 	var status string
 	if err := storage.DB.QueryRow("SELECT test_id, status FROM attempt WHERE id = $1", attemptID).Scan(&testID, &status); err != nil {
@@ -133,39 +133,68 @@ func CompleteAttempt(attemptID int) error {
 	return nil
 }
 
-func CheckAttempt(userID, testID int) ([]QA, string, error) {
+type AttemptCheckResult struct {
+	Answers []QA
+	Status  string
+	Score   int
+}
+
+func CheckAttempt(userID, testID int) (AttemptCheckResult, error) {
+	var res AttemptCheckResult
+
+	// Ищем попытку
 	var attemptID int
-	var status string
-	queryStatus := "SELECT id, status FROM attempt WHERE user_id = $1 AND test_id = $2"
-	if err := storage.DB.QueryRow(queryStatus, userID, testID).Scan(&attemptID, &status); err != nil {
-		return nil, "", fmt.Errorf("attempt not found")
+	queryStatus := "SELECT id, status, score FROM attempt WHERE user_id = $1 AND test_id = $2"
+	if err := storage.DB.QueryRow(queryStatus, userID, testID).Scan(&attemptID, &res.Status, &res.Score); err != nil {
+		return res, fmt.Errorf("attempt not found")
 	}
 
+	// Гарантируем, что попытка завершена
+	if res.Status != "completed" {
+		return res, fmt.Errorf("attempt is not completed yet")
+	}
+
+	// Собираем ответы
 	answers := make([]QA, 0)
 	query := "SELECT question_id, answer_option_id FROM user_answer WHERE attempt_id = $1"
 	rows, err := storage.DB.Query(query, attemptID)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to fetch answers: %v", err)
+		return res, fmt.Errorf("failed to fetch answers: %v", err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var qID, aID int
-		_ = rows.Scan(&qID, &aID)
+		if err := rows.Scan(&qID, &aID); err != nil {
+			return res, fmt.Errorf("scan user_answer error: %v", err)
+		}
 
 		var question string
 		_ = storage.DB.QueryRow("SELECT title FROM question WHERE id = $1", qID).Scan(&question)
 
 		var answer string
-		err = storage.DB.QueryRow("SELECT text FROM answer_option WHERE id = $1", aID).Scan(&answer)
-		if err != nil {
+		// aID может быть -1 (не отвечено)
+		if aID > 0 {
+			err = storage.DB.QueryRow("SELECT text FROM answer_option WHERE id = $1", aID).Scan(&answer)
+			if err != nil {
+				answer = "Not answered"
+			}
+		} else {
 			answer = "Not answered"
 		}
 
-		answers = append(answers, QA{QuestionText: question, AnswerText: answer})
+		answers = append(answers, QA{
+			QuestionText: question,
+			AnswerText:   answer,
+		})
 	}
 
-	return answers, status, nil
+	if err := rows.Err(); err != nil {
+		return res, fmt.Errorf("rows error: %v", err)
+	}
+
+	res.Answers = answers
+	return res, nil
 }
 
 func DeleteAnswer(userID, testID, questionID int) error {
