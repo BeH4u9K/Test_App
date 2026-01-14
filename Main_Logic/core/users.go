@@ -240,3 +240,61 @@ func ChangeBlockStatus(id int, blocked bool) error {
 
 	return nil
 }
+
+type UserShort struct {
+	ID       int    `json:"id"`
+	FullName string `json:"full_name"`
+}
+
+func GetAllUsers() ([]UserShort, error) {
+	query := "SELECT id, full_name FROM users WHERE is_blocked = FALSE"
+	rows, err := storage.DB.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("select users error: %v", err)
+	}
+
+	users := make([]UserShort, 0)
+
+	for rows.Next() {
+		var u UserShort
+		if err := rows.Scan(&u.ID, &u.FullName); err != nil {
+			return nil, fmt.Errorf("scan error: %v", err)
+		}
+		users = append(users, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows Err: %v", err)
+	}
+
+	return users, nil
+}
+
+func ChangeUserName(id int, newName string) error {
+	query := "UPDATE users SET full_name = $1 WHERE id = $2 AND is_blocked = FALSE"
+	res, err := storage.DB.Exec(query, newName, id)
+	if err != nil {
+		return fmt.Errorf("change user name error: %v", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("RowsAffected error: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		// Проверяем, существует ли пользователь
+		checkQuery := "SELECT id FROM users WHERE id = $1"
+		var existingID int
+		err := storage.DB.QueryRow(checkQuery, id).Scan(&existingID)
+
+		if err == sql.ErrNoRows {
+			// Пользователь не существует
+			return fmt.Errorf("User with id %d not found", id)
+		}
+
+		// Пользователь существует, но заблокирован
+		return fmt.Errorf("User with id %d is blocked", id)
+	}
+
+	return nil
+}

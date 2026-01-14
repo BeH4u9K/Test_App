@@ -16,3 +16,4 @@ user_data/
 .vscode/
 .idea/
 .rdb
+build/

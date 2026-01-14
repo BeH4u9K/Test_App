@@ -142,7 +142,7 @@ func UpdateDisciplineHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Валидация: хотя бы одно поле должно быть заполнено
-	if req.Name == "" || req.Description == "" {
+	if req.Name == "" && req.Description == "" {
 		writeValidationError(w, "name or description must be provided")
 		return
 	}
@@ -243,7 +243,7 @@ func UpdateTestStateHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s (disciplineID=%d, testID=%d)", r.Method, r.URL.Path, discID, testID)
 
 	var req struct {
-		IsActive *bool `json:"is_active"` // pointer для отличия от false
+		IsActive *bool `json:"is_active"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
