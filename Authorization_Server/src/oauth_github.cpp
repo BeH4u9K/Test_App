@@ -11,6 +11,20 @@ void handle_github_callback(
     SessionStorage& storage,
     const json& config
 ) {
+    std::cout << "\nGITHUB CALLBACK STARTED: " << std::endl;
+    std::cout << "Full URL: " << req.path << std::endl;
+    std::cout << "Query string: " << req.body << std::endl;
+    
+    std::cout << "All params:" << std::endl;
+    for (const auto& param : req.params) {
+        std::cout << "  " << param.first << ": " << param.second << std::endl;
+    }
+
+    std::cout << "Headers:" << std::endl;
+    for (const auto& header : req.headers) {
+        std::cout << "  " << header.first << ": " << header.second << std::endl;
+    }
+
     std::string code = req.get_param_value("code");
     std::string oauth_state = req.get_param_value("state");
     std::string error = req.get_param_value("error");
@@ -52,7 +66,7 @@ void handle_github_callback(
     std::string post_body = "client_id=" + client_id + "&client_secret=" + client_secret +
         "&code=" + code + "&redirect_uri=" + redirect_uri;
         
-    auto token_response = http_post("github.com", "/login/oauth/access_token", post_body);
+    auto token_response = http_post("https://github.com", "/login/oauth/access_token", post_body);
     if (!token_response) {
         std::cerr << "Failed to exchange code for token" << std::endl;
         res.set_content("<h1>Ошибка сервера</h1><p>Не удалось получить токен от GitHub.</p>", "text/html; charset=utf-8");
@@ -61,24 +75,53 @@ void handle_github_callback(
 
     std::string response_body = *token_response;
     std::string access_token;
-    size_t token_start = response_body.find("access_token=");
-    if (token_start != std::string::npos) {
-        token_start += 13;
-        size_t token_end = response_body.find('&', token_start);
-        if (token_end == std::string::npos) {
-            access_token = response_body.substr(token_start);
+    
+    std::cout << "GitHub token response: " << response_body << std::endl;
+    
+    try {
+        if (response_body.find('{') != std::string::npos) {
+            json token_data = json::parse(response_body);
+            access_token = token_data["access_token"].get<std::string>();
+            std::cout << "Parsed access_token from JSON: " << access_token.substr(0, 10) << "..." << std::endl;
         } else {
-            access_token = response_body.substr(token_start, token_end - token_start);
+            size_t token_start = response_body.find("access_token=");
+            if (token_start != std::string::npos) {
+                token_start += 13;
+                size_t token_end = response_body.find('&', token_start);
+                if (token_end == std::string::npos) {
+                    access_token = response_body.substr(token_start);
+                } else {
+                    access_token = response_body.substr(token_start, token_end - token_start);
+                }
+                std::cout << "Parsed access_token from form: " << access_token.substr(0, 10) << "..." << std::endl;
+            }
+        }
+    } catch (const json::exception& e) {
+        std::cerr << "Failed to parse GitHub token response as JSON: " << e.what() << std::endl;
+        std::cerr << "Response was: " << response_body << std::endl;
+        size_t token_start = response_body.find("access_token=");
+        if (token_start != std::string::npos) {
+            token_start += 13;
+            size_t token_end = response_body.find('&', token_start);
+            if (token_end == std::string::npos) {
+                access_token = response_body.substr(token_start);
+            } else {
+                access_token = response_body.substr(token_start, token_end - token_start);
+            }
+            std::cout << "Parsed access_token from form (after JSON error): " << access_token.substr(0, 10) << "..." << std::endl;
         }
     }
-        
+
     if (access_token.empty()) {
         std::cerr << "No access token in response: " << response_body << std::endl;
         res.set_content("<h1>Ошибка</h1><p>Не удалось получить токен доступа от GitHub.</p>", "text/html; charset=utf-8");
         return;
     }
+    
+    std::cout << "Successfully obtained GitHub access token (first 10 chars): " 
+        << access_token.substr(0, std::min(10, (int)access_token.length())) << "..." << std::endl;
 
-    auto user_response = http_get_with_auth("api.github.com", "/user", access_token);
+    auto user_response = http_get_with_auth("https://api.github.com", "/user", access_token);
     if (!user_response) {
         std::cerr << "Failed to get user data from GitHub" << std::endl;
         res.set_content("<h1>Ошибка</h1><p>Не удалось получить данные пользователя от GitHub.</p>", "text/html; charset=utf-8");
@@ -92,7 +135,7 @@ void handle_github_callback(
         if (user_data.contains("email") && !user_data["email"].is_null()) {
             email = user_data["email"].get<std::string>();
         } else {
-            auto emails_response = http_get_with_auth("api.github.com", "/user/emails", access_token);
+            auto emails_response = http_get_with_auth("https://api.github.com", "/user/emails", access_token);
             if (emails_response) {
                 json emails = json::parse(*emails_response);
                 if (emails.is_array() && !emails.empty()) {

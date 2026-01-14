@@ -206,11 +206,13 @@ void register_handlers(
 
     // callback от github
     server.Get("/callback/github", [&](const Request& req, Response& res) {
+        set_cors_headers(res);
         handle_github_callback(req, res, session_storage, config);
     });
 
     // callback от yandex
     server.Get("/callback/yandex", [&](const Request& req, Response& res) {
+        set_cors_headers(res);
         handle_yandex_callback(req, res, session_storage, config);
     });
 

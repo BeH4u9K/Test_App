@@ -1,7 +1,7 @@
-#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "../include/utils.hpp"
 #include <random>
 #include <sstream>
+#include <iomanip>
 
 using namespace httplib;
 
@@ -29,14 +29,28 @@ std::optional<std::string> http_post(
     const std::string& body,
     const std::string& content_type
 ) {
-    SSLClient cli(host.c_str());
+    Client cli(host);
     cli.set_connection_timeout(5);
     cli.set_read_timeout(5);
-    cli.enable_server_certificate_verification(false);
+    cli.set_follow_location(true);
 
-    auto res = cli.Post(path.c_str(), body, content_type.c_str());
-    if (res && res->status == 200)
-        return res->body;
+    httplib::Headers headers = {
+        {"Accept", "application/json"},
+        {"User-Agent", "Authorization-Server/1.0"}
+    };
+
+    auto res = cli.Post(path.c_str(), headers, body, content_type.c_str());
+    
+    if (res) {
+        std::cout << "HTTP POST Response Status: " << res->status << std::endl;
+        std::cout << "Response Body: " << res->body << std::endl;
+        
+        if (res->status == 200) {
+            return res->body;
+        }
+    } else {
+        std::cerr << "HTTP POST failed: No response" << std::endl;
+    }
 
     return std::nullopt;
 }
@@ -46,10 +60,9 @@ std::optional<std::string> http_get_with_auth(
     const std::string& path,
     const std::string& token
 ) {
-    SSLClient cli(host.c_str());
+    Client cli(host);
     cli.set_connection_timeout(5);
     cli.set_read_timeout(5);
-    cli.enable_server_certificate_verification(false);
     cli.set_bearer_token_auth(token.c_str());
 
     auto res = cli.Get(path.c_str());
