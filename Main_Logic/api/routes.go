@@ -22,6 +22,7 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}/state", handlers.GetTestStateHandler).Methods("GET")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}/state", handlers.UpdateTestStateHandler).Methods("PUT")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.DeleteTestHandler).Methods("DELETE")
+	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.GetTestHandler).Methods("GET")
 
 	// Students
 	api.HandleFunc("/disciplines/{id:[0-9]+}/students", handlers.GetDisciplineStudentsHandler).Methods("GET")
@@ -37,11 +38,13 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/users/{id:[0-9]+}/state", handlers.IsUserBlockedHandler).Methods("GET")
 	api.HandleFunc("/users/{id:[0-9]+}/state", handlers.ChangeBlockStatusHandler).Methods("PUT")
 	api.HandleFunc("/users", handlers.RegisterUserHandler).Methods("POST")
+	api.HandleFunc("/users", handlers.GetAllUsersHandler).Methods("GET")
+	api.HandleFunc("/users/{id:[0-9]+}/name", handlers.GetUserNameHandler).Methods("GET")
+	api.HandleFunc("/users/{id:[0-9]+}/name", handlers.ChangeUserNameHandler).Methods("PUT")
 
 	// Questions
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.RemoveQuestionHandler).Methods("DELETE")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.AddQuestionHandler).Methods("POST")
-	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.ReorderQuestionsHandler).Methods("PUT")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}/passers/attempts", handlers.CheckUserAnswersHandler).Methods("GET")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}/questions", handlers.GetQuestionsHandler).Methods("GET")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+/questions/{questionID:[0-9]+}}", handlers.GetQuestionHandler).Methods("GET")

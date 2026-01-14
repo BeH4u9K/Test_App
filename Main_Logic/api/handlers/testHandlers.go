@@ -80,43 +80,6 @@ func AddQuestionHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ResponseMessage{Message: "Question was successfuly add to test"})
 }
 
-func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
-	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
-	if err != nil {
-		return
-	}
-
-	testID, err := GetIDFromVars(w, r, "testID")
-	if err != nil {
-		return
-	}
-
-	var req struct {
-		NewOrder []int `json:"new_order"`
-	}
-
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&req); err != nil {
-		log.Printf("ERROR: Failed to decode request: %v", err)
-		writeValidationError(w, "Invalid request body")
-		return
-	}
-
-	err = core.ReorderQuestions(disciplineID, testID, req.NewOrder)
-	if err != nil {
-		log.Printf("ERROR: %v", err)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ResponseMessage{Message: "Order of questions was successfully changed"})
-
-}
-
 func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 
 	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
@@ -213,4 +176,28 @@ func CheckUserAnswersHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
 
+}
+
+func GetTestHandler(w http.ResponseWriter, r *http.Request) {
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
+	if err != nil {
+		return
+	}
+
+	t, err := core.GetTest(disciplineID, testID)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(t)
 }

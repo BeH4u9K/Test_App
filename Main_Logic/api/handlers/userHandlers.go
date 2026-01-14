@@ -189,3 +189,84 @@ func ChangeBlockStatusHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ResponseMessage{Message: "User block status changed successfully"})
 }
+
+func GetAllUsersHandler(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("Request: %s %s", r.Method, r.URL.Path)
+
+	users := make([]core.UserShort, 0)
+
+	users, err := core.GetAllUsers()
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(users)
+}
+
+func GetUserNameHandler(w http.ResponseWriter, r *http.Request) {
+
+	id, err := GetIDFromVars(w, r, "id")
+	if err != nil {
+		return
+	}
+
+	log.Printf("Request: %s %s (id=%d)", r.Method, r.URL.Path, id)
+
+	name, err := core.GetFullName(id)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var response struct {
+		Name string `json:"name"`
+	}
+	response.Name = name
+
+	json.NewEncoder(w).Encode(response)
+
+}
+
+func ChangeUserNameHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := GetIDFromVars(w, r, "id")
+	if err != nil {
+		return
+	}
+
+	log.Printf("Request: %s %s (id=%d)", r.Method, r.URL.Path, id)
+
+	var req struct {
+		NewName string `json:"new_name"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		log.Printf("ERROR: Failed to decode request: %v", err)
+		writeValidationError(w, "Invalid request body")
+		return
+	}
+
+	err = core.ChangeUserName(id, req.NewName)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ResponseMessage{Message: "User name changed successfully", Data: req.NewName})
+}

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"main_logic/storage"
-	"strings"
 )
 
 // Структуры
@@ -159,125 +158,6 @@ func AddQuestionToTest(
 			"question with root_id %d not found in discipline %d or test %d",
 			questionRootID, disciplineID, testID,
 		)
-	}
-
-	return nil
-}
-
-// Функция принимает на вход ID вопросов (их корни) в таком порядке, в каком их бы желал видеть пользователь
-func ReorderQuestions(
-	disciplineID int,
-	testID int,
-	rootIds []int,
-) error {
-	// Валидация входных параметров
-	if disciplineID <= 0 || testID <= 0 {
-		return fmt.Errorf("invalid parameters: disciplineID and testID must be positive")
-	}
-
-	if len(rootIds) == 0 {
-		return fmt.Errorf("cannot reorder questions: rootIds list is empty")
-	}
-
-	// Проверяем принадлежность теста дисциплине
-	var testExists bool
-	err := storage.DB.QueryRow(`
-        SELECT EXISTS(
-            SELECT 1 FROM test t
-            WHERE t.id = $1
-            AND t.discipline_id = $2
-            AND t.is_deleted = false
-        )
-    `, testID, disciplineID).Scan(&testExists)
-
-	if err != nil {
-		return fmt.Errorf("failed to fetch test: %v", err)
-	}
-
-	if !testExists {
-		return fmt.Errorf(
-			"test with id %d not found in discipline %d",
-			testID, disciplineID,
-		)
-	}
-
-	// Проверяем наличие попыток прохождения теста
-	has, err := hasAttempts(testID)
-	if err != nil {
-		return fmt.Errorf("error checking attempts: %v", err)
-	}
-
-	if has {
-		return fmt.Errorf(
-			"cannot change order of questions for test %d in discipline %d: test has existing attempts",
-			testID, disciplineID,
-		)
-	}
-
-	// Проверяем, что все переданные root_id принадлежат этому тесту
-	placeholders := make([]string, len(rootIds))
-	args := make([]interface{}, len(rootIds)+2)
-	args[0] = testID
-	args[1] = disciplineID
-
-	for i, id := range rootIds {
-		if id <= 0 {
-			return fmt.Errorf("invalid root_id at index %d: must be positive", i)
-		}
-		placeholders[i] = fmt.Sprintf("$%d", i+3)
-		args[i+2] = id
-	}
-
-	countQuery := fmt.Sprintf(`
-        SELECT COUNT(*) FROM question q
-        INNER JOIN test t ON q.test_id = t.id
-        WHERE t.id = $1
-        AND t.discipline_id = $2
-        AND q.root_id IN (%s)
-        AND q.is_deleted = false
-    `, strings.Join(placeholders, ","))
-
-	var count int
-	err = storage.DB.QueryRow(countQuery, args...).Scan(&count)
-	if err != nil {
-		return fmt.Errorf("failed to verify questions: %v", err)
-	}
-
-	if count != len(rootIds) {
-		return fmt.Errorf(
-			"not all questions found in test %d of discipline %d: expected %d, found %d",
-			testID, disciplineID, len(rootIds), count,
-		)
-	}
-
-	// Обновляем позиции вопросов
-	newOrder := 1
-	for _, id := range rootIds {
-		res, err := storage.DB.Exec(`
-            UPDATE question
-            SET position = $1
-            WHERE root_id = $2
-            AND test_id = $3
-            AND is_deleted = false
-        `, newOrder, id, testID)
-
-		if err != nil {
-			return fmt.Errorf("failed to update position for question %d: %v", id, err)
-		}
-
-		rowsAffected, err := res.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("error checking rows affected for question %d: %v", id, err)
-		}
-
-		if rowsAffected == 0 {
-			return fmt.Errorf(
-				"failed to update question %d order in test %d of discipline %d",
-				id, testID, disciplineID,
-			)
-		}
-
-		newOrder++
 	}
 
 	return nil
@@ -572,4 +452,17 @@ func CheckUserAnswers(
 	}
 
 	return result, nil
+}
+
+func GetTest(disciplineID, testID int) (TestShort, error) {
+	query := "SELECT id, name FROM test WHERE discipline_id = $1 AND id = $2"
+
+	var t TestShort
+
+	res := storage.DB.QueryRow(query, disciplineID, testID)
+	if err := res.Scan(&t.ID, &t.Name); err != nil {
+		return TestShort{}, fmt.Errorf("scan errror: %v", err)
+	}
+
+	return t, nil
 }

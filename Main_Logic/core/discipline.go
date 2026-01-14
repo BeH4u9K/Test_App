@@ -82,10 +82,6 @@ func GetDisciplineByID(id int) (DisciplineDTO, error) {
 
 func ChangeDiscInfo(id int, newName string, newDescription string) error {
 
-	if newName == "" || newDescription == "" {
-		return fmt.Errorf("name or description can't be empty")
-	}
-
 	var isDeleted bool
 	checkQuery := "SELECT is_deleted FROM discipline WHERE id = $1"
 	err := storage.DB.QueryRow(checkQuery, id).Scan(&isDeleted)
@@ -101,8 +97,17 @@ func ChangeDiscInfo(id int, newName string, newDescription string) error {
 		return fmt.Errorf("discipline with id %d not found", id)
 	}
 
-	query := "UPDATE discipline SET name = $1, description = $2 WHERE id = $3"
-	_, err = storage.DB.Exec(query, newName, newDescription, id)
+	// Обновляем только заполненные поля
+	if newName != "" && newDescription != "" {
+		query := "UPDATE discipline SET name = $1, description = $2 WHERE id = $3"
+		_, err = storage.DB.Exec(query, newName, newDescription, id)
+	} else if newName != "" {
+		query := "UPDATE discipline SET name = $1 WHERE id = $2"
+		_, err = storage.DB.Exec(query, newName, id)
+	} else if newDescription != "" {
+		query := "UPDATE discipline SET description = $1 WHERE id = $2"
+		_, err = storage.DB.Exec(query, newDescription, id)
+	}
 
 	if err != nil {
 		return fmt.Errorf("failed to update discipline: %v", err)
