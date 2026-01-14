@@ -52,7 +52,7 @@ void handle_github_callback(
     std::string post_body = "client_id=" + client_id + "&client_secret=" + client_secret +
         "&code=" + code + "&redirect_uri=" + redirect_uri;
         
-    auto token_response = http_post("https://github.com", "/login/oauth/access_token", post_body);
+    auto token_response = http_post("github.com", "/login/oauth/access_token", post_body);
     if (!token_response) {
         std::cerr << "Failed to exchange code for token" << std::endl;
         res.set_content("<h1>Ошибка сервера</h1><p>Не удалось получить токен от GitHub.</p>", "text/html; charset=utf-8");
@@ -78,7 +78,7 @@ void handle_github_callback(
         return;
     }
 
-    auto user_response = http_get_with_auth("https://api.github.com", "/user", access_token);
+    auto user_response = http_get_with_auth("api.github.com", "/user", access_token);
     if (!user_response) {
         std::cerr << "Failed to get user data from GitHub" << std::endl;
         res.set_content("<h1>Ошибка</h1><p>Не удалось получить данные пользователя от GitHub.</p>", "text/html; charset=utf-8");
@@ -92,7 +92,7 @@ void handle_github_callback(
         if (user_data.contains("email") && !user_data["email"].is_null()) {
             email = user_data["email"].get<std::string>();
         } else {
-            auto emails_response = http_get_with_auth("https://api.github.com", "/user/emails", access_token);
+            auto emails_response = http_get_with_auth("api.github.com", "/user/emails", access_token);
             if (emails_response) {
                 json emails = json::parse(*emails_response);
                 if (emails.is_array() && !emails.empty()) {

@@ -1,7 +1,7 @@
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "../include/utils.hpp"
 #include <random>
 #include <sstream>
-#include <iomanip>
 
 using namespace httplib;
 
@@ -29,9 +29,10 @@ std::optional<std::string> http_post(
     const std::string& body,
     const std::string& content_type
 ) {
-    Client cli(host);
+    SSLClient cli(host.c_str());
     cli.set_connection_timeout(5);
     cli.set_read_timeout(5);
+    cli.enable_server_certificate_verification(false);
 
     auto res = cli.Post(path.c_str(), body, content_type.c_str());
     if (res && res->status == 200)
@@ -45,9 +46,10 @@ std::optional<std::string> http_get_with_auth(
     const std::string& path,
     const std::string& token
 ) {
-    Client cli(host);
+    SSLClient cli(host.c_str());
     cli.set_connection_timeout(5);
     cli.set_read_timeout(5);
+    cli.enable_server_certificate_verification(false);
     cli.set_bearer_token_auth(token.c_str());
 
     auto res = cli.Get(path.c_str());

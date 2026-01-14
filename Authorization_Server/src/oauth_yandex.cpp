@@ -49,7 +49,7 @@ void handle_yandex_callback(
     std::string post_body = "grant_type=authorization_code" + std::string("&code=") + code +
         "&client_id=" + client_id + "&client_secret=" + client_secret;
         
-    auto token_response = http_post("https://oauth.yandex.ru", "/token", post_body);
+    auto token_response = http_post("oauth.yandex.ru", "/token", post_body);
     if (!token_response) {
         std::cerr << "Failed to exchange code for Yandex token" << std::endl;
         res.set_content("<h1>Ошибка сервера</h1><p>Не удалось получить токен от Яндекс.</p>", "text/html; charset=utf-8");
