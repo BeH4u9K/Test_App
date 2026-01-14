@@ -1,4 +1,0 @@
-Authorization_Server/src/handlers.cpp
-Authorization_Server/src/oauth_github.cpp
-Authorization_Server/src/oauth_yandex.cpp
-Authorization_Server/src/utils.cpp

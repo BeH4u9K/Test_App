@@ -8,7 +8,7 @@ const PORT = 3007;
 // CORS настройка
 app.use((req, res, next) => {
   const allowedOrigins = [
-    'http://localhost:5179',
+    'http://localhost:5180',
     'http://localhost:3000',
     'http://localhost:3007',
     'http://127.0.0.1:5175',
