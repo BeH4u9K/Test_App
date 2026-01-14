@@ -32,24 +32,20 @@ std::optional<std::string> http_post(
     Client cli(host);
     cli.set_connection_timeout(5);
     cli.set_read_timeout(5);
-    cli.set_follow_location(true);
 
-    httplib::Headers headers = {
-        {"Accept", "application/json"},
-        {"User-Agent", "Authorization-Server/1.0"}
-    };
-
-    auto res = cli.Post(path.c_str(), headers, body, content_type.c_str());
+    std::cout << "HTTP POST to: " << host << path << std::endl;
+    std::cout << "Body: " << body << std::endl;
+    
+    auto res = cli.Post(path.c_str(), body, content_type.c_str());
     
     if (res) {
-        std::cout << "HTTP POST Response Status: " << res->status << std::endl;
-        std::cout << "Response Body: " << res->body << std::endl;
-        
+        std::cout << "Response status: " << res->status << std::endl;
+        std::cout << "Response body: " << res->body << std::endl;
         if (res->status == 200) {
             return res->body;
         }
     } else {
-        std::cerr << "HTTP POST failed: No response" << std::endl;
+        std::cerr << "ERROR: No response from server" << std::endl;
     }
 
     return std::nullopt;

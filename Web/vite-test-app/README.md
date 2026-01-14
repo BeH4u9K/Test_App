@@ -20,3 +20,4 @@ docker-compose down
 docker-compose logs -f
 
 redis-server  
+redis-cli 

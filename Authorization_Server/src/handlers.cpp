@@ -64,7 +64,7 @@ void register_handlers(
         if (provider == "github") {
             std::string redirect_uri;
             std::string client_id;
-
+    
             if (config.contains("github") && config["github"].is_object() && config["github"].contains("client_id") && 
                 config["github"]["client_id"].is_string() && !config["github"]["client_id"].get<std::string>().empty() &&
                 config["github"].contains("redirect_uri") && config["github"]["redirect_uri"].is_string() &&
@@ -77,14 +77,14 @@ void register_handlers(
                     {"error", "GitHub OAuth not configured properly"},
                     {"message", "Check your config/config.json file"}
                 };
-
+        
                 res.set_content(error_response.dump(), "application/json");
                 return;
             }
-            
-            std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id + 
-                "&redirect_uri=" + redirect_uri + "&state=" + oauth_state + "&scope=user:email";
-                
+            std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id + "&redirect_uri=" + 
+                redirect_uri + "&response_type=code" + "&state=" + oauth_state + "&scope=user:email";
+        
+            std::cout << "GitHub auth URL: " << url << std::endl;
             response["auth_url"] = url;
 
         } else if (provider == "yandex") {
