@@ -1,14 +1,16 @@
 package core
 
 import (
+	"database/sql"
 	"fmt"
 	"main_logic/storage"
+	"strings"
 )
 
 // Структуры
 type AttemptShort struct {
-	UserID int
-	Mark   int
+	UserID int `json:"user_id"`
+	Mark   int `json:"mark"`
 }
 
 type UserAnswer struct {
@@ -24,116 +26,385 @@ type QA struct {
 // Функции
 
 // Удалить вопрос из теста (мягкое удаление). Удаление идёт по корню, то есть все версии автоматически отпадут
-func RemoveQuestionFromTest(testID int, questionRootID int) error {
-	var isActive bool
-	if err := storage.DB.QueryRow("SELECT is_active FROM test WHERE id = $1", testID).Scan(&isActive); err == nil && isActive {
-		return fmt.Errorf("cannot remove questions from an active test")
+func RemoveQuestionFromTest(
+	disciplineID int,
+	testID int,
+	questionRootID int,
+) error {
+	// Валидация входных параметров
+	if disciplineID <= 0 || testID <= 0 || questionRootID <= 0 {
+		return fmt.Errorf("invalid parameters: disciplineID, testID, and questionRootID must be positive")
 	}
 
-	query := "UPDATE question SET is_deleted = TRUE WHERE root_id = $1 AND test_id = $2"
-	res, err := storage.DB.Exec(query, questionRootID, testID)
+	// Проверяем принадлежность теста дисциплине и активность теста
+	var isActive bool
+	err := storage.DB.QueryRow(`
+        SELECT t.is_active
+        FROM test t
+        WHERE t.id = $1
+        AND t.discipline_id = $2
+        AND t.is_deleted = false
+    `, testID, disciplineID).Scan(&isActive)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return fmt.Errorf(
+				"test with id %d not found in discipline %d",
+				testID, disciplineID,
+			)
+		}
+		return fmt.Errorf("failed to fetch test: %v", err)
+	}
+
+	// Проверяем, активен ли тест
+	if isActive {
+		return fmt.Errorf(
+			"cannot remove question %d from active test %d",
+			questionRootID, testID,
+		)
+	}
+
+	// Удаляем все версии вопроса (soft delete по root_id)
+	res, err := storage.DB.Exec(`
+        UPDATE question
+        SET is_deleted = true
+        WHERE root_id = $1
+        AND test_id = $2
+    `, questionRootID, testID)
+
 	if err != nil {
 		return fmt.Errorf("failed to remove question: %v", err)
 	}
+
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("error checking rows affected: %v", err)
 	}
+
 	if rowsAffected == 0 {
-		return fmt.Errorf("question with root_id %d in test %d not found or deleted", questionRootID, testID)
+		return fmt.Errorf(
+			"question with root_id %d in test %d of discipline %d not found or already deleted",
+			questionRootID, testID, disciplineID,
+		)
 	}
+
 	return nil
 }
 
 // Функция "привязывает" тест к вопросу
-func AddQuestionToTest(testID int, questionRootID int) error {
+func AddQuestionToTest(
+	disciplineID int,
+	testID int,
+	questionRootID int,
+) error {
+	// Валидация входных параметров
+	if disciplineID <= 0 || testID <= 0 || questionRootID <= 0 {
+		return fmt.Errorf("invalid parameters: disciplineID, testID, and questionRootID must be positive")
+	}
+
+	// Проверяем принадлежность теста дисциплине
+	var testExists bool
+	err := storage.DB.QueryRow(`
+        SELECT EXISTS(
+            SELECT 1 FROM test t
+            WHERE t.id = $1
+            AND t.discipline_id = $2
+            AND t.is_deleted = false
+        )
+    `, testID, disciplineID).Scan(&testExists)
+
+	if err != nil {
+		return fmt.Errorf("failed to fetch test: %v", err)
+	}
+
+	if !testExists {
+		return fmt.Errorf(
+			"test with id %d not found in discipline %d",
+			testID, disciplineID,
+		)
+	}
+
+	// Проверяем наличие попыток прохождения теста
 	has, err := hasAttempts(testID)
 	if err != nil {
 		return fmt.Errorf("error checking attempts: %v", err)
 	}
+
 	if has {
-		return fmt.Errorf("test with id %d has attempts, cannot add more questions", testID)
+		return fmt.Errorf(
+			"test with id %d in discipline %d has attempts, cannot add more questions",
+			testID, disciplineID,
+		)
 	}
-	query := "UPDATE question SET test_id = $1 WHERE root_id = $2 AND is_deleted = FALSE"
-	res, err := storage.DB.Exec(query, testID, questionRootID)
+
+	// Добавляем вопрос к тесту (обновляем test_id для всех версий вопроса)
+	res, err := storage.DB.Exec(`
+        UPDATE question
+        SET test_id = $1
+        WHERE root_id = $2
+        AND is_deleted = false
+    `, testID, questionRootID)
+
 	if err != nil {
 		return fmt.Errorf("failed to add question: %v", err)
 	}
+
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("error checking rows affected: %v", err)
 	}
 
 	if rowsAffected == 0 {
-		return fmt.Errorf("test or question not found")
+		return fmt.Errorf(
+			"question with root_id %d not found in discipline %d or test %d",
+			questionRootID, disciplineID, testID,
+		)
 	}
+
 	return nil
 }
 
 // Функция принимает на вход ID вопросов (их корни) в таком порядке, в каком их бы желал видеть пользователь
-func ReorderQuestions(testID int, rootIds []int) error {
+func ReorderQuestions(
+	disciplineID int,
+	testID int,
+	rootIds []int,
+) error {
+	// Валидация входных параметров
+	if disciplineID <= 0 || testID <= 0 {
+		return fmt.Errorf("invalid parameters: disciplineID and testID must be positive")
+	}
+
+	if len(rootIds) == 0 {
+		return fmt.Errorf("cannot reorder questions: rootIds list is empty")
+	}
+
+	// Проверяем принадлежность теста дисциплине
+	var testExists bool
+	err := storage.DB.QueryRow(`
+        SELECT EXISTS(
+            SELECT 1 FROM test t
+            WHERE t.id = $1
+            AND t.discipline_id = $2
+            AND t.is_deleted = false
+        )
+    `, testID, disciplineID).Scan(&testExists)
+
+	if err != nil {
+		return fmt.Errorf("failed to fetch test: %v", err)
+	}
+
+	if !testExists {
+		return fmt.Errorf(
+			"test with id %d not found in discipline %d",
+			testID, disciplineID,
+		)
+	}
+
+	// Проверяем наличие попыток прохождения теста
 	has, err := hasAttempts(testID)
 	if err != nil {
 		return fmt.Errorf("error checking attempts: %v", err)
 	}
+
 	if has {
-		return fmt.Errorf("cannot change order of questions for a test with existing attempts")
+		return fmt.Errorf(
+			"cannot change order of questions for test %d in discipline %d: test has existing attempts",
+			testID, disciplineID,
+		)
 	}
 
+	// Проверяем, что все переданные root_id принадлежат этому тесту
+	placeholders := make([]string, len(rootIds))
+	args := make([]interface{}, len(rootIds)+2)
+	args[0] = testID
+	args[1] = disciplineID
+
+	for i, id := range rootIds {
+		if id <= 0 {
+			return fmt.Errorf("invalid root_id at index %d: must be positive", i)
+		}
+		placeholders[i] = fmt.Sprintf("$%d", i+3)
+		args[i+2] = id
+	}
+
+	countQuery := fmt.Sprintf(`
+        SELECT COUNT(*) FROM question q
+        INNER JOIN test t ON q.test_id = t.id
+        WHERE t.id = $1
+        AND t.discipline_id = $2
+        AND q.root_id IN (%s)
+        AND q.is_deleted = false
+    `, strings.Join(placeholders, ","))
+
+	var count int
+	err = storage.DB.QueryRow(countQuery, args...).Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to verify questions: %v", err)
+	}
+
+	if count != len(rootIds) {
+		return fmt.Errorf(
+			"not all questions found in test %d of discipline %d: expected %d, found %d",
+			testID, disciplineID, len(rootIds), count,
+		)
+	}
+
+	// Обновляем позиции вопросов
 	newOrder := 1
 	for _, id := range rootIds {
-		query := "UPDATE question SET position = $1 WHERE root_id = $2 AND test_id = $3 AND is_deleted = FALSE"
-		res, err := storage.DB.Exec(query, newOrder, id, testID)
+		res, err := storage.DB.Exec(`
+            UPDATE question
+            SET position = $1
+            WHERE root_id = $2
+            AND test_id = $3
+            AND is_deleted = false
+        `, newOrder, id, testID)
+
 		if err != nil {
 			return fmt.Errorf("failed to update position for question %d: %v", id, err)
 		}
+
 		rowsAffected, err := res.RowsAffected()
-		if err != nil || rowsAffected == 0 {
-			return fmt.Errorf("failed to update question %d order", id)
+		if err != nil {
+			return fmt.Errorf("error checking rows affected for question %d: %v", id, err)
 		}
-		newOrder += 1
+
+		if rowsAffected == 0 {
+			return fmt.Errorf(
+				"failed to update question %d order in test %d of discipline %d",
+				id, testID, disciplineID,
+			)
+		}
+
+		newOrder++
 	}
+
 	return nil
 }
 
 // Функция возвращает всех, кто прошёл тест.
-func GetTestPassers(testID int) ([]int, error) {
+func GetTestPassers(disciplineID int, testID int) ([]int, error) {
+	// Валидация входных параметров
+	if disciplineID <= 0 || testID <= 0 {
+		return nil, fmt.Errorf("invalid parameters: disciplineID and testID must be positive")
+	}
+
+	// Проверяем принадлежность теста дисциплине
+	var testExists bool
+	err := storage.DB.QueryRow(`
+        SELECT EXISTS(
+            SELECT 1 FROM test t
+            WHERE t.id = $1
+            AND t.discipline_id = $2
+            AND t.is_deleted = false
+        )
+    `, testID, disciplineID).Scan(&testExists)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch test: %v", err)
+	}
+
+	if !testExists {
+		return nil, fmt.Errorf(
+			"test with id %d not found in discipline %d",
+			testID, disciplineID,
+		)
+	}
+
+	// Проверяем наличие попыток прохождения теста
 	has, err := hasAttempts(testID)
 	if err != nil {
 		return nil, fmt.Errorf("error checking attempts: %v", err)
 	}
+
 	if !has {
-		return nil, fmt.Errorf("no attempts found for test %d", testID)
+		return nil, fmt.Errorf(
+			"no attempts found for test %d in discipline %d",
+			testID, disciplineID,
+		)
 	}
+
+	// Получаем список пользователей, завершивших тест
 	users := make([]int, 0)
-	query := "SELECT user_id FROM attempt WHERE test_id = $1 AND status = $2"
+	query := `
+        SELECT user_id
+        FROM attempt
+        WHERE test_id = $1
+        AND status = $2
+    `
 	rows, err := storage.DB.Query(query, testID, "completed")
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch passers: %v", err)
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var i int
-		if err := rows.Scan(&i); err != nil {
+		var userID int
+		if err := rows.Scan(&userID); err != nil {
 			return nil, fmt.Errorf("scan error: %v", err)
 		}
-		users = append(users, i)
+		users = append(users, userID)
 	}
+
+	// Проверяем ошибки итерации
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %v", err)
+	}
+
 	return users, nil
 }
 
 // Функция возвращает ID и оценки тех пользователей, которые прошли тест.
-func GetUserMarks(testID int) ([]AttemptShort, error) {
+func GetUserMarks(disciplineID int, testID int) ([]AttemptShort, error) {
+	// Валидация входных параметров
+	if disciplineID <= 0 || testID <= 0 {
+		return nil, fmt.Errorf("invalid parameters: disciplineID and testID must be positive")
+	}
+
+	// Проверяем принадлежность теста дисциплине
+	var testExists bool
+	err := storage.DB.QueryRow(`
+        SELECT EXISTS(
+            SELECT 1 FROM test t
+            WHERE t.id = $1
+            AND t.discipline_id = $2
+            AND t.is_deleted = false
+        )
+    `, testID, disciplineID).Scan(&testExists)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch test: %v", err)
+	}
+
+	if !testExists {
+		return nil, fmt.Errorf(
+			"test with id %d not found in discipline %d",
+			testID, disciplineID,
+		)
+	}
+
+	// Проверяем наличие попыток прохождения теста
 	has, err := hasAttempts(testID)
 	if err != nil {
 		return nil, fmt.Errorf("error checking attempts: %v", err)
 	}
+
 	if !has {
-		return nil, fmt.Errorf("no attempts found for test %d", testID)
+		return nil, fmt.Errorf(
+			"no attempts found for test %d in discipline %d",
+			testID, disciplineID,
+		)
 	}
 
+	// Получаем оценки пользователей
 	result := make([]AttemptShort, 0)
-	query := "SELECT user_id, score FROM attempt WHERE test_id = $1 AND status = 'completed'"
+	query := `
+        SELECT user_id, score
+        FROM attempt
+        WHERE test_id = $1
+        AND status = 'completed'
+    `
 	rows, err := storage.DB.Query(query, testID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch marks: %v", err)
@@ -147,27 +418,72 @@ func GetUserMarks(testID int) ([]AttemptShort, error) {
 		}
 		result = append(result, a)
 	}
+
+	// Проверяем ошибки итерации
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %v", err)
+	}
+
 	return result, nil
 }
 
 // Функция принимает на вход ID теста и возвращает все попытки пользователей, включая их ответы на вопросы.
-func CheckUserAnswers(testID int) ([]UserAnswer, error) {
+func CheckUserAnswers(
+	disciplineID int,
+	testID int,
+) ([]UserAnswer, error) {
+	// Валидация входных параметров
+	if disciplineID <= 0 || testID <= 0 {
+		return nil, fmt.Errorf("invalid parameters: disciplineID and testID must be positive")
+	}
+
+	// Проверяем принадлежность теста дисциплине
+	var testExists bool
+	err := storage.DB.QueryRow(`
+        SELECT EXISTS(
+            SELECT 1 FROM test t
+            WHERE t.id = $1
+            AND t.discipline_id = $2
+            AND t.is_deleted = false
+        )
+    `, testID, disciplineID).Scan(&testExists)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch test: %v", err)
+	}
+
+	if !testExists {
+		return nil, fmt.Errorf(
+			"test with id %d not found in discipline %d",
+			testID, disciplineID,
+		)
+	}
+
 	// Проверка были ли попытки у теста
 	has, err := hasAttempts(testID)
 	if err != nil {
 		return nil, fmt.Errorf("error checking attempts: %v", err)
 	}
+
 	if !has {
-		return nil, fmt.Errorf("test with id %d has no attempts", testID)
+		return nil, fmt.Errorf(
+			"test with id %d in discipline %d has no attempts",
+			testID, disciplineID,
+		)
 	}
 
 	// Собираем всех пользователей, которые прошли тест
 	result := make([]UserAnswer, 0)
 
-	// Первым делом получим ID пользователей, которые прошли тест
+	// Получим ID пользователей, которые прошли тест
 	userIds := make([]int, 0)
 
-	queryUsers := "SELECT user_id FROM attempt WHERE test_id = $1 AND status = 'completed'"
+	queryUsers := `
+        SELECT user_id
+        FROM attempt
+        WHERE test_id = $1
+        AND status = 'completed'
+    `
 	rows, err := storage.DB.Query(queryUsers, testID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch users: %v", err)
@@ -182,6 +498,10 @@ func CheckUserAnswers(testID int) ([]UserAnswer, error) {
 		userIds = append(userIds, userID)
 	}
 
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating users: %v", err)
+	}
+
 	// Теперь находим ответы пользователя по его ID
 	for _, userID := range userIds {
 		var u UserAnswer
@@ -190,19 +510,29 @@ func CheckUserAnswers(testID int) ([]UserAnswer, error) {
 
 		// 1. Находим attempt_id
 		var attemptID int
-		queryAttempt := "SELECT id FROM attempt WHERE test_id = $1 AND user_id = $2 AND status = 'completed'"
+		queryAttempt := `
+            SELECT id
+            FROM attempt
+            WHERE test_id = $1
+            AND user_id = $2
+            AND status = 'completed'
+        `
 		err := storage.DB.QueryRow(queryAttempt, testID, userID).Scan(&attemptID)
 		if err != nil {
+			// Пропускаем пользователя, если не найдена попытка
 			continue
 		}
 
 		// 2. Находим все user_answer по этому attempt_id
-		queryAnswers := "SELECT question_id, answer_option_id FROM user_answer WHERE attempt_id = $1"
+		queryAnswers := `
+            SELECT question_id, answer_option_id
+            FROM user_answer
+            WHERE attempt_id = $1
+        `
 		rowsAnswers, err := storage.DB.Query(queryAnswers, attemptID)
 		if err != nil {
 			continue
 		}
-		defer rowsAnswers.Close()
 
 		// 3. Для каждой пары берём текст вопроса и ответа
 		for rowsAnswers.Next() {
@@ -213,7 +543,10 @@ func CheckUserAnswers(testID int) ([]UserAnswer, error) {
 
 			var questionText string
 			queryQuestion := "SELECT text FROM question WHERE id = $1"
-			_ = storage.DB.QueryRow(queryQuestion, questionID).Scan(&questionText)
+			err := storage.DB.QueryRow(queryQuestion, questionID).Scan(&questionText)
+			if err != nil {
+				questionText = "Unknown/Empty"
+			}
 
 			var answerText string
 			queryAnswer := "SELECT text FROM answer_option WHERE id = $1"
@@ -222,8 +555,18 @@ func CheckUserAnswers(testID int) ([]UserAnswer, error) {
 				answerText = "Unknown/Empty"
 			}
 
-			answers = append(answers, QA{QuestionText: questionText, AnswerText: answerText})
+			answers = append(answers, QA{
+				QuestionText: questionText,
+				AnswerText:   answerText,
+			})
 		}
+
+		if err = rowsAnswers.Err(); err != nil {
+			continue
+		}
+
+		rowsAnswers.Close()
+
 		u.Answers = answers
 		result = append(result, u)
 	}

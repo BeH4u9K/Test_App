@@ -8,7 +8,13 @@ import (
 )
 
 func RemoveQuestionHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -24,7 +30,7 @@ func RemoveQuestionHandler(w http.ResponseWriter, r *http.Request) {
 		writeValidationError(w, "Invalid request body")
 		return
 	}
-	err = core.RemoveQuestionFromTest(testID, req.RootID)
+	err = core.RemoveQuestionFromTest(disciplineID, testID, req.RootID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -38,7 +44,13 @@ func RemoveQuestionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func AddQuestionHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -55,7 +67,7 @@ func AddQuestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = core.AddQuestionToTest(testID, req.RootID)
+	err = core.AddQuestionToTest(disciplineID, testID, req.RootID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -69,7 +81,12 @@ func AddQuestionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -86,7 +103,7 @@ func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = core.ReorderQuestions(testID, req.NewOrder)
+	err = core.ReorderQuestions(disciplineID, testID, req.NewOrder)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -101,14 +118,20 @@ func ReorderQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
 
 	testIDs := make([]int, 0)
 
-	testIDs, err = core.GetTestPassers(testID)
+	testIDs, err = core.GetTestPassers(disciplineID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -116,8 +139,10 @@ func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 		return
 	}
-
-	result := make([]string, 0)
+	type Name struct {
+		FullName string `json:"full_name"`
+	}
+	result := make([]Name, 0)
 
 	for _, v := range testIDs {
 		name, err := core.GetFullName(v)
@@ -128,7 +153,9 @@ func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 			return
 		}
-		result = append(result, name)
+		var n Name
+		n.FullName = name
+		result = append(result, n)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -136,13 +163,19 @@ func GetTestPassersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUserMarksHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
 
 	userMarks := make([]core.AttemptShort, 0)
-	userMarks, err = core.GetUserMarks(testID)
+	userMarks, err = core.GetUserMarks(disciplineID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -156,14 +189,19 @@ func GetUserMarksHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CheckUserAnswersHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
 
 	res := make([]core.UserAnswer, 0)
 
-	res, err = core.CheckUserAnswers(testID)
+	res, err = core.CheckUserAnswers(disciplineID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")

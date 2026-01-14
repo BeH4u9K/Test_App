@@ -8,12 +8,19 @@ import (
 )
 
 func GetQuestionsHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "id")
+
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
 	if err != nil {
 		return
 	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
+	if err != nil {
+		return
+	}
+
 	res := make([]core.QuestionListItem, 0)
-	res, err = core.GetQuestions(testID)
+	res, err = core.GetQuestions(disciplineID, testID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -28,11 +35,17 @@ func GetQuestionsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetQuestionHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "test_id")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
 	if err != nil {
 		return
 	}
-	questionID, err := GetIDFromVars(w, r, "question_id")
+
+	testID, err := GetIDFromVars(w, r, "testID")
+	if err != nil {
+		return
+	}
+
+	questionID, err := GetIDFromVars(w, r, "questionID")
 	if err != nil {
 		return
 	}
@@ -50,7 +63,7 @@ func GetQuestionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var q core.Question
-	q, err = core.GetQuestion(testID, questionID, req.Version)
+	q, err = core.GetQuestion(disciplineID, testID, questionID, req.Version)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -63,7 +76,12 @@ func GetQuestionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateQuestionHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "test_id")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
 	if err != nil {
 		return
 	}
@@ -82,7 +100,7 @@ func CreateQuestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := core.CreateQuestion(testID, req.Title, req.Text, req.Answers)
+	id, err := core.CreateQuestion(disciplineID, testID, req.Title, req.Text, req.Answers)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -99,6 +117,16 @@ func CreateQuestionHandler(w http.ResponseWriter, r *http.Request) {
 
 func UpdateQuestionHandler(w http.ResponseWriter, r *http.Request) {
 
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
+	if err != nil {
+		return
+	}
+
+	testID, err := GetIDFromVars(w, r, "testID")
+	if err != nil {
+		return
+	}
+
 	var req struct {
 		RootID     int                 `json:"root_id"`
 		NewTitle   string              `json:"new_title"`
@@ -114,7 +142,7 @@ func UpdateQuestionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := core.UpdateQuestion(req.RootID, req.NewTitle, req.NewText, req.NewAnswers)
+	id, err := core.UpdateQuestion(disciplineID, testID, req.RootID, req.NewTitle, req.NewText, req.NewAnswers)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -128,16 +156,22 @@ func UpdateQuestionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteQuestionHandler(w http.ResponseWriter, r *http.Request) {
-	testID, err := GetIDFromVars(w, r, "test_id")
-	if err != nil {
-		return
-	}
-	questionID, err := GetIDFromVars(w, r, "question_id")
+	disciplineID, err := GetIDFromVars(w, r, "disciplineID")
 	if err != nil {
 		return
 	}
 
-	err = core.DeleteQuestion(testID, questionID)
+	testID, err := GetIDFromVars(w, r, "testID")
+	if err != nil {
+		return
+	}
+
+	questionID, err := GetIDFromVars(w, r, "questionID")
+	if err != nil {
+		return
+	}
+
+	err = core.DeleteQuestion(disciplineID, testID, questionID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")

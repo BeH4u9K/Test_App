@@ -13,16 +13,16 @@ import (
 
 // UserTest содержит информацию о тесте и оценке пользователя
 type UserTest struct {
-	ID    int
-	Name  string
-	Score int
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Score int    `json:"score"`
 }
 
 // UserDiscipline содержит информацию о дисциплине и тестах в ней
 type UserDiscipline struct {
-	ID    int
-	Name  string
-	Tests []UserTest
+	ID    int        `json:"id"`
+	Name  string     `json:"name"`
+	Tests []UserTest `json:"tests"`
 }
 
 // Ошибки связанные с регистрацией
@@ -34,7 +34,7 @@ var (
 
 // UserData содержит полную информацию о пользователе (курсы, тесты, оценки)
 type UserData struct {
-	Disciplines []UserDiscipline
+	Disciplines []UserDiscipline `json:"disciplines"`
 }
 
 // Вспомогательная ф-ция для валидации почты

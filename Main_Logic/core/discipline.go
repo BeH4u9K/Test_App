@@ -8,25 +8,25 @@ import (
 )
 
 type Discipline struct {
-	Name        string
-	Description string
-	ID          int
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	ID          int    `json:"id"`
 }
 
 type DisciplineDTO struct {
-	Name        string
-	Description string
-	TeacherID   int
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	TeacherID   int    `json:"teacher_id"`
 }
 
 type TestShort struct {
-	ID   int
-	Name string
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 type StudentShort struct {
-	ID       int
-	FullName string
+	ID       int    `json:"id"`
+	FullName string `json:"full_name"`
 }
 
 func GetAllDisciplines() ([]Discipline, error) {

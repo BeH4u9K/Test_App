@@ -334,7 +334,7 @@ func DeleteTestHandler(w http.ResponseWriter, r *http.Request) {
 
 // Students
 func GetDisciplineStudentsHandler(w http.ResponseWriter, r *http.Request) {
-	discID, err := GetIDFromVars(w, r, "disciplineID")
+	discID, err := GetIDFromVars(w, r, "id")
 	if err != nil {
 		return
 	}
