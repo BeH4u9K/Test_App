@@ -15,35 +15,52 @@ services:
     environment:
       - TZ=Europe/Moscow
       - LOG_LEVEL=DEBUG
-      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-      - SSL_CERT_DIR=/etc/ssl/certs
-    command: ./authorization_server
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DB=auth_database
+    depends_on:
+      mongodb:
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    tty: true
-    stdin_open: true
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
+    networks:
+      - auth-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/auth?provider=github&login_token=healthcheck"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 40s
+
+  mongodb:
+    image: mongo:6.0
+    container_name: auth-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      - MONGO_INITDB_DATABASE=auth_database
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+    command: mongod --auth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - auth-network
+
+volumes:
+  mongodb_data:
 
 networks:
   auth-network:
     driver: bridge
-    name: auth-network

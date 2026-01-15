@@ -10,3 +10,8 @@ Thumbs.db
 *.swp
 *.swo
 *~
+__pycache__/
+venv/
+.env
+docker-compose.override.yml
+mongo-init.js
