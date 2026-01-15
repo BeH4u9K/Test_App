@@ -42,7 +42,6 @@ type AttemptCheckResult struct {
 func CreateAttempt(userID int, testID int) (*CreateAttemptResponse, error) {
 	var isTestActive bool
 	var disciplineID int
-
 	queryTest := "SELECT is_active, discipline_id FROM test WHERE id = $1 AND is_deleted = FALSE"
 	if err := storage.DB.QueryRow(queryTest, testID).Scan(&isTestActive, &disciplineID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -55,6 +54,7 @@ func CreateAttempt(userID int, testID int) (*CreateAttemptResponse, error) {
 		return nil, fmt.Errorf("test with id %d is not active right now", testID)
 	}
 
+	// Проверяем, что пользователь записан на дисциплину
 	var dummy int
 	checkEnroll := "SELECT 1 FROM user_discipline WHERE user_id = $1 AND discipline_id = $2"
 	if err := storage.DB.QueryRow(checkEnroll, userID, disciplineID).Scan(&dummy); err != nil {
@@ -64,6 +64,7 @@ func CreateAttempt(userID int, testID int) (*CreateAttemptResponse, error) {
 		return nil, fmt.Errorf("database validation error: %v", err)
 	}
 
+	// Проверяем, что у пользователя нет уже существующей попытки
 	var attemptCount int
 	checkAttemptQuery := "SELECT COUNT(*) FROM attempt WHERE user_id = $1 AND test_id = $2"
 	if err := storage.DB.QueryRow(checkAttemptQuery, userID, testID).Scan(&attemptCount); err != nil {
@@ -129,13 +130,13 @@ ORDER BY q.position ASC
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch answer options for question %d: %v", q.ID, err)
 		}
+
 		q.Options = options
 
-		// Инициализируем user_answer запись
-		_, _ = storage.DB.Exec(
-			"INSERT INTO user_answer (attempt_id, question_id, answer_option_id) VALUES ($1, $2, -1)",
-			attemptID, q.ID,
-		)
+		// Инициализируем user_answer запись (неопределённый ответ)
+		if err = initializeUserAnswer(attemptID, q.ID); err != nil {
+			return nil, fmt.Errorf("failed to initialize user_answer for question %d: %v", q.ID, err)
+		}
 
 		questions = append(questions, q)
 	}
@@ -145,6 +146,20 @@ ORDER BY q.position ASC
 	}
 
 	return questions, nil
+}
+
+// initializeUserAnswer инициализирует запись в user_answer как "неопределённо"
+// В БД храним NULL, в логике считаем это как -1.
+func initializeUserAnswer(attemptID, questionID int) error {
+	query := `
+INSERT INTO user_answer (attempt_id, question_id, answer_option_id)
+VALUES ($1, $2, NULL)
+`
+	_, err := storage.DB.Exec(query, attemptID, questionID)
+	if err != nil {
+		return fmt.Errorf("database error: %v", err)
+	}
+	return nil
 }
 
 // Получаем варианты ответов для вопроса
@@ -195,6 +210,7 @@ func CompleteAttempt(userID, attemptID int, answers []UserAnswerData) error {
 	if err != nil {
 		return fmt.Errorf("failed to get question ids: %v", err)
 	}
+
 	if len(validQuestionIDs) == 0 {
 		return fmt.Errorf("test has no questions")
 	}
@@ -271,9 +287,11 @@ func validateAnswers(answers []UserAnswerData, validQuestionIDs []int) error {
 		if !validQMap[answer.QuestionID] {
 			return fmt.Errorf("invalid question id: %d", answer.QuestionID)
 		}
+
 		if answer.AnswerOption < -1 {
 			return fmt.Errorf("invalid answer option id: %d for question %d", answer.AnswerOption, answer.QuestionID)
 		}
+
 		answeredQuestions[answer.QuestionID] = true
 	}
 
@@ -301,10 +319,12 @@ WHERE attempt_id = $2 AND question_id = $3
 		if err != nil {
 			return fmt.Errorf("failed to check rows affected: %v", err)
 		}
+
 		if rowsAffected == 0 {
 			return fmt.Errorf("no user_answer record found for attempt %d, question %d", attemptID, answer.QuestionID)
 		}
 	}
+
 	return nil
 }
 
@@ -320,8 +340,9 @@ func calculateScore(attemptID int, testID int) (int, error) {
 		return 0, fmt.Errorf("test has no questions")
 	}
 
+	// Читаем NULL как -1, чтобы трактовать как "не отвечено"
 	rows, err := storage.DB.Query(
-		"SELECT answer_option_id FROM user_answer WHERE attempt_id = $1",
+		"SELECT COALESCE(answer_option_id, -1) FROM user_answer WHERE attempt_id = $1",
 		attemptID,
 	)
 	if err != nil {
@@ -351,6 +372,7 @@ func calculateScore(attemptID int, testID int) (int, error) {
 			correctAnswers++
 		}
 	}
+
 	if err := rows.Err(); err != nil {
 		return 0, fmt.Errorf("rows error: %v", err)
 	}
@@ -378,9 +400,9 @@ func CheckAttempt(userID, testID int) (AttemptCheckResult, error) {
 		return res, fmt.Errorf("attempt is not completed yet")
 	}
 
-	// Собираем ответы
+	// Собираем ответы, NULL трактуем как -1
 	answers := make([]QA, 0)
-	query := "SELECT question_id, answer_option_id FROM user_answer WHERE attempt_id = $1"
+	query := "SELECT question_id, COALESCE(answer_option_id, -1) FROM user_answer WHERE attempt_id = $1"
 	rows, err := storage.DB.Query(query, attemptID)
 	if err != nil {
 		return res, fmt.Errorf("failed to fetch answers: %v", err)

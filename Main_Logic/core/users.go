@@ -161,25 +161,33 @@ func GetUserData(id int) (UserData, error) {
 	return result, nil
 }
 
+type Roles struct {
+	Roles []string `json:"roles"`
+}
+
 // GetUserRoles возвращает массив ролей пользователя
-func GetUserRoles(id int) ([]string, error) {
+func GetUserRoles(id int) (Roles, error) {
 	query := "SELECT role FROM user_role WHERE user_id = $1"
 	rows, err := storage.DB.Query(query, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch roles: %v", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return Roles{}, fmt.Errorf("user with id %d not found", id)
+		}
+		return Roles{}, fmt.Errorf("failed to fetch roles: %v", err)
 	}
-	result := make([]string, 0)
 	defer rows.Close()
+	var result Roles
+	result.Roles = make([]string, 0)
 
 	for rows.Next() {
 		var r string
 		if err := rows.Scan(&r); err != nil {
-			return nil, fmt.Errorf("scan role error: %v", err)
+			return Roles{}, fmt.Errorf("scan role error: %v", err)
 		}
-		result = append(result, r)
+		result.Roles = append(result.Roles, r)
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows error: %v", err)
+		return Roles{}, fmt.Errorf("rows error: %v", err)
 	}
 
 	return result, nil
@@ -247,7 +255,7 @@ type UserShort struct {
 }
 
 func GetAllUsers() ([]UserShort, error) {
-	query := "SELECT id, full_name FROM users WHERE is_blocked = FALSE"
+	query := "SELECT id, full_name FROM users WHERE is_blocked = FALSE ORDER BY id"
 	rows, err := storage.DB.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("select users error: %v", err)
@@ -271,7 +279,7 @@ func GetAllUsers() ([]UserShort, error) {
 }
 
 func ChangeUserName(id int, newName string) error {
-	query := "UPDATE users SET full_name = $1 WHERE id = $2 AND is_blocked = FALSE"
+	query := "UPDATE users SET full_name = $1 WHERE id = $2"
 	res, err := storage.DB.Exec(query, newName, id)
 	if err != nil {
 		return fmt.Errorf("change user name error: %v", err)
@@ -292,8 +300,6 @@ func ChangeUserName(id int, newName string) error {
 			return fmt.Errorf("User with id %d not found", id)
 		}
 
-		// Пользователь существует, но заблокирован
-		return fmt.Errorf("User with id %d is blocked", id)
 	}
 
 	return nil
