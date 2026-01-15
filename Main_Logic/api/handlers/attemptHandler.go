@@ -9,8 +9,8 @@ import (
 
 // Структуры для парсинга ответов
 type UserAnswer struct {
-	QuestionID   int `json:"question_id"`
-	AnswerOption int `json:"answer_option_id"`
+	QuestionID     int `json:"question_id"`
+	AnswerOptionID int `json:"answer_option_id"`
 }
 
 type CompleteAttemptRequest struct {
@@ -75,7 +75,7 @@ func CompleteAttemptHandler(w http.ResponseWriter, r *http.Request) {
 	for i, a := range req.Answers {
 		answers[i] = core.UserAnswerData{
 			QuestionID:   a.QuestionID,
-			AnswerOption: a.AnswerOption,
+			AnswerOption: a.AnswerOptionID,
 		}
 	}
 

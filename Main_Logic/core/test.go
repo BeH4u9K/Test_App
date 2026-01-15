@@ -2,6 +2,7 @@ package core
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"main_logic/storage"
 )
@@ -13,13 +14,13 @@ type AttemptShort struct {
 }
 
 type UserAnswer struct {
-	UserID  int
-	Answers []QA
+	UserID  int  `json:"user_id"`
+	Answers []QA `json:"answers"`
 }
 
 type QA struct {
-	QuestionText string
-	AnswerText   string
+	QuestionText string `json:"question_text"`
+	AnswerText   string `json:"answer_text"`
 }
 
 // Функции
@@ -455,13 +456,25 @@ func CheckUserAnswers(
 }
 
 func GetTest(disciplineID, testID int) (TestShort, error) {
+	var exists bool
+	checkQuery := "SELECT EXISTS(SELECT 1 FROM discipline WHERE id = $1 AND is_deleted = FALSE)"
+	if err := storage.DB.QueryRow(checkQuery, disciplineID).Scan(&exists); err != nil {
+		return TestShort{}, fmt.Errorf("check discipline error: %v", err)
+	}
+	if !exists {
+		return TestShort{}, fmt.Errorf("discipline not found")
+	}
+
 	query := "SELECT id, name FROM test WHERE discipline_id = $1 AND id = $2"
 
 	var t TestShort
 
 	res := storage.DB.QueryRow(query, disciplineID, testID)
 	if err := res.Scan(&t.ID, &t.Name); err != nil {
-		return TestShort{}, fmt.Errorf("scan errror: %v", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return TestShort{}, fmt.Errorf("Test with id %d not found", testID)
+		}
+		return TestShort{}, fmt.Errorf("scan error: %v", err)
 	}
 
 	return t, nil

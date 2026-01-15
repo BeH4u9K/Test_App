@@ -8,14 +8,16 @@ import (
 )
 
 type Discipline struct {
+	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	ID          int    `json:"id"`
+	TeacherName string `json:"teacher_name"`
 }
 
 type DisciplineDTO struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	TeacherName string `json:"teacher_name"`
 	TeacherID   int    `json:"teacher_id"`
 }
 
@@ -30,7 +32,11 @@ type StudentShort struct {
 }
 
 func GetAllDisciplines() ([]Discipline, error) {
-	query := "SELECT id, name, description FROM discipline WHERE is_deleted = FALSE ORDER BY id"
+	query := `
+        SELECT id, name, description, teacher_id
+        FROM discipline
+        WHERE is_deleted = FALSE
+        ORDER BY id`
 	rows, err := storage.DB.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch disciplines: %v", err)
@@ -40,9 +46,19 @@ func GetAllDisciplines() ([]Discipline, error) {
 	answer := make([]Discipline, 0)
 	for rows.Next() {
 		var d Discipline
-		if err := rows.Scan(&d.ID, &d.Name, &d.Description); err != nil {
+		var teacherID int
+
+		if err := rows.Scan(&d.ID, &d.Name, &d.Description, &teacherID); err != nil {
 			return nil, fmt.Errorf("failed to scan discipline: %v", err)
 		}
+
+		err = storage.DB.
+			QueryRow("SELECT full_name FROM users WHERE id = $1", teacherID).
+			Scan(&d.TeacherName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch teacher name: %v", err)
+		}
+
 		answer = append(answer, d)
 	}
 
@@ -73,8 +89,19 @@ func GetDisciplineByID(id int) (DisciplineDTO, error) {
 	row := storage.DB.QueryRow(query, id)
 
 	var result DisciplineDTO
-	if scanErr := row.Scan(&result.Name, &result.Description, &result.TeacherID); scanErr != nil {
-		return DisciplineDTO{}, fmt.Errorf("failed to scan discipline: %v", scanErr)
+	err = row.Scan(&result.Name, &result.Description, &result.TeacherID)
+	if err != nil {
+		return DisciplineDTO{}, fmt.Errorf("failed to scan discipline: %v", err)
+	}
+
+	teacherQuery := "SELECT full_name FROM users WHERE id = $1"
+	err = storage.DB.QueryRow(teacherQuery, result.TeacherID).Scan(&result.TeacherName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			result.TeacherName = ""
+		} else {
+			return DisciplineDTO{}, fmt.Errorf("failed to scan teacher: %v", err)
+		}
 	}
 
 	return result, nil

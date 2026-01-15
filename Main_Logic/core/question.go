@@ -31,7 +31,6 @@ type Question struct {
 // QuestionListItem содержит краткую информацию о вопросе для списка
 type QuestionListItem struct {
 	ID      int    `json:"id"`
-	RootID  int    `json:"root_id"`
 	Title   string `json:"title"`
 	Version int    `json:"version"`
 }
@@ -43,7 +42,7 @@ func GetQuestions(disciplineID, testID int) ([]QuestionListItem, error) {
 
 	result := make([]QuestionListItem, 0)
 	query := `
-       SELECT q.id, q.root_id, q.title, q.version 
+       SELECT q.id, q.title, q.version 
        FROM question q
        INNER JOIN test t ON q.test_id = t.id
        WHERE q.test_id = $1 
@@ -66,7 +65,7 @@ func GetQuestions(disciplineID, testID int) ([]QuestionListItem, error) {
 
 	for rows.Next() {
 		var q QuestionListItem
-		if err := rows.Scan(&q.ID, &q.RootID, &q.Title, &q.Version); err != nil {
+		if err := rows.Scan(&q.ID, &q.Title, &q.Version); err != nil {
 			return nil, fmt.Errorf("scan error: %v", err)
 		}
 		result = append(result, q)
