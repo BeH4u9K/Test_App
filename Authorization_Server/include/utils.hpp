@@ -13,8 +13,9 @@ std::optional<std::string> http_post(
     const std::string& content_type = "application/x-www-form-urlencoded"
 );
 
-std::optional<std::string> http_get_with_auth(
-    const std::string& host,
-    const std::string& path,
-    const std::string& token
+std::optional<std::string> http_post_with_headers(
+    const std::string& host, 
+    const std::string& path, 
+    const std::string& body,
+    const httplib::Headers& headers = {}
 );

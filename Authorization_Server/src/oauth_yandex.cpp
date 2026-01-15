@@ -16,9 +16,7 @@ void handle_yandex_callback(
     std::string error = req.get_param_value("error");
     
     std::cout << "=== YANDEX CALLBACK START ===" << std::endl;
-    std::cout << "GET /callback/yandex - code: " << code 
-              << ", oauth_state: " << oauth_state 
-              << ", error: " << error << std::endl;
+    std::cout << "GET /callback/yandex - code: " << code << ", oauth_state: " << oauth_state  << ", error: " << error << std::endl;
 
     if (!error.empty()) {
         std::cout << "Yandex returned error: " << error << std::endl;
@@ -39,9 +37,7 @@ void handle_yandex_callback(
         [&](AuthSession& session) {
             std::cout << "Processing session for login_token: " << session.login_token << std::endl;
             
-            // Проверяем конфигурацию
-            if (!config.contains("yandex") || !config["yandex"].contains("client_id") || 
-                !config["yandex"].contains("client_secret")) {
+            if (!config.contains("yandex") || !config["yandex"].contains("client_id") || !config["yandex"].contains("client_secret")) {
                 throw std::runtime_error("Yandex config missing or incomplete");
             }
             
@@ -52,11 +48,8 @@ void handle_yandex_callback(
                 throw std::runtime_error("Yandex client_id or client_secret is empty");
             }
             
-            // Получаем токен от Яндекс
-            std::string post_body = "grant_type=authorization_code" + 
-                                   std::string("&code=") + code +
-                                   "&client_id=" + client_id + 
-                                   "&client_secret=" + client_secret;
+            std::string post_body = "grant_type=authorization_code" + std::string("&code=") + code +
+                "&client_id=" + client_id + "&client_secret=" + client_secret;
             
             std::cout << "Requesting token from Yandex..." << std::endl;
             auto token_response = http_post("https://oauth.yandex.ru", "/token", post_body);
@@ -85,7 +78,6 @@ void handle_yandex_callback(
                       << yandex_access_token.substr(0, std::min(20, (int)yandex_access_token.length())) 
                       << "..." << std::endl;
 
-            // Получаем данные пользователя
             httplib::Client cli("https://login.yandex.ru");
             cli.set_connection_timeout(5);
             cli.set_read_timeout(5);
@@ -104,8 +96,7 @@ void handle_yandex_callback(
             std::cout << "User info status: " << user_res->status << std::endl;
             
             if (user_res->status != 200) {
-                throw std::runtime_error("Failed to get user data from Yandex. Status: " + 
-                                         std::to_string(user_res->status));
+                throw std::runtime_error("Failed to get user data from Yandex. Status: " + std::to_string(user_res->status));
             }
             
             json user_data;
@@ -124,11 +115,9 @@ void handle_yandex_callback(
             std::string email = user_data["default_email"].get<std::string>();
             std::cout << "Yandex user email: " << email << std::endl;
             
-            // Генерируем токены
             std::string jwt_access_token = "yandex_access_" + generate_state_token();
             std::string jwt_refresh_token = "yandex_refresh_" + generate_state_token();
             
-            // Обновляем сессию
             session.status = AuthStatus::GRANTED;
             session.access_token = jwt_access_token;
             session.refresh_token = jwt_refresh_token;
@@ -144,8 +133,7 @@ void handle_yandex_callback(
         return;
     }
     
-    std::cout << "Authorization granted for user: " << *session_opt->user_id 
-              << ", login_token: " << session_opt->login_token << std::endl;
+    std::cout << "Authorization granted for user: " << *session_opt->user_id << ", login_token: " << session_opt->login_token << std::endl;
     std::cout << "=== YANDEX CALLBACK SUCCESS ===" << std::endl;
     
     res.set_content("<h1>Успешная авторизация!</h1><p>Вы успешно авторизовались через Яндекс.</p><p>Закройте это окно и вернитесь в приложение.</p>", "text/html; charset=utf-8");

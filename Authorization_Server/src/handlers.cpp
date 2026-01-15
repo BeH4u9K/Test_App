@@ -111,6 +111,7 @@ void register_handlers(
             std::string url = "https://oauth.yandex.ru/authorize?response_type=code" + std::string("&client_id=") + 
                 client_id + "&redirect_uri=" + redirect_uri + "&state=" + oauth_state;
                 
+            std::cout << "Yandex auth URL: " << url << std::endl;
             response["auth_url"] = url;
             
         } else if (provider == "code") {

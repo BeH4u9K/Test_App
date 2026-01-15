@@ -45,7 +45,6 @@ public:
         sessions_by_login_[session.login_token] = session;
     }
     
-    // Новый метод: атомарно получить и обновить сессию
     std::optional<AuthSession> get_and_update_session_by_oauth_state(
         const std::string& oauth_state,
         std::function<void(AuthSession&)> update_func
@@ -71,7 +70,6 @@ public:
         }
     }
     
-    // Новый метод: обновить статус сессии по oauth_state
     bool update_session_status_by_oauth_state(
         const std::string& oauth_state,
         AuthStatus new_status
