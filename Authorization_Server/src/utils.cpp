@@ -51,31 +51,3 @@ std::optional<std::string> http_post(
     
     return std::nullopt;
 }
-
-std::optional<std::string> http_get_with_auth(
-    const std::string& host,
-    const std::string& path,
-    const std::string& token
-) {
-    Client cli(host);
-    cli.set_connection_timeout(10);
-    cli.set_read_timeout(10);
-    cli.set_bearer_token_auth(token.c_str());
-    
-    std::cout << "HTTP GET with auth to: " << host << path << std::endl;
-    
-    auto res = cli.Get(path.c_str());
-    
-    if (res) {
-        std::cout << "Response status: " << res->status << std::endl;
-        if (res->status == 200) {
-            return res->body;
-        } else {
-            std::cerr << "Error response body: " << res->body << std::endl;
-        }
-    } else {
-        std::cerr << "ERROR: No response from server " << host << std::endl;
-    }
-    
-    return std::nullopt;
-}
