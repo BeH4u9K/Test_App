@@ -38,9 +38,7 @@ void handle_github_callback(
         return;
     }
 
-    auto session_opt = storage.get_and_update_session_by_oauth_state(
-        oauth_state,
-        [&](AuthSession& session) {
+    auto session_opt = storage.get_and_update_session_by_oauth_state(oauth_state, [&](AuthSession& session) {
             std::cout << "Processing session for login_token: " << session.login_token << std::endl;
             
             if (!config.contains("github") || !config["github"].contains("client_id") || 
@@ -61,36 +59,39 @@ void handle_github_callback(
             
             std::cout << "Requesting token from GitHub..." << std::endl;
 
+            httplib::Client token_cli("https://github.com");
+            token_cli.enable_server_certificate_verification(false);
+            token_cli.set_connection_timeout(30);
+            token_cli.set_read_timeout(30);
+
             httplib::Headers headers = {
-                {"Accept", "application/json"}
+                {"Accept", "application/json"},
+                {"Content-Type", "application/x-www-form-urlencoded"},
+                {"User-Agent", "Authorization-Server/1.0"}
             };
-            
-            auto token_response = http_post_with_headers(
-                "https://github.com", 
-                "/login/oauth/access_token", 
-                post_body,
-                headers
-            );
-            
-            if (!token_response) {
-                throw std::runtime_error("Failed to exchange code for GitHub token");
+
+            auto res = token_cli.Post("/login/oauth/access_token", headers, post_body, "application/x-www-form-urlencoded");
+
+            if (!res) {
+                std::cerr << "ERROR: Connection to GitHub failed" << std::endl;
+                throw std::runtime_error("Failed to connect to GitHub");
             }
-            
-            std::cout << "Token response received: " << token_response->substr(0, 100) << "..." << std::endl;
-            
+
+            if (res->status != 200) {
+                std::cerr << "ERROR: GitHub returned status " << res->status << std::endl;
+                std::cerr << "Response: " << res->body << std::endl;
+                throw std::runtime_error("GitHub API error: " + std::to_string(res->status));
+            }
+
             json token_data;
             try {
-                token_data = json::parse(*token_response);
+                token_data = json::parse(res->body);
             } catch (const json::exception& e) {
-                throw std::runtime_error("Failed to parse token response: " + std::string(e.what()) + "\nResponse: " + *token_response);
+                std::cerr << "ERROR: Failed to parse JSON from GitHub: " << e.what() << std::endl;
+                std::cerr << "Raw response: " << res->body << std::endl;
+                throw std::runtime_error("Failed to parse GitHub response: " + std::string(e.what()));
             }
-            
-            if (token_data.contains("error")) {
-                std::string error_msg = token_data.value("error", "Unknown error");
-                std::string error_desc = token_data.value("error_description", "");
-                throw std::runtime_error("GitHub token error: " + error_msg + (error_desc.empty() ? "" : " - " + error_desc));
-            }
-            
+
             if (!token_data.contains("access_token") || token_data["access_token"].is_null()) {
                 std::cerr << "ERROR: No access_token in response" << std::endl;
                 std::cerr << "Full response: " << token_data.dump() << std::endl;

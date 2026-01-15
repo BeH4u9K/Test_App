@@ -1,6 +1,2 @@
 cd Authorization_Server
-mkdir -p build
-cd build
-cmake ..
-cmake --build .
-./Debug/authorization_server.exe
+docker-compose up --build

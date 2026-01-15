@@ -1,0 +1,12 @@
+build/
+.vscode/
+.git/
+*.log
+*.o
+*.a
+*.so
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

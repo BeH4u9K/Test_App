@@ -51,39 +51,3 @@ std::optional<std::string> http_post(
     
     return std::nullopt;
 }
-
-std::optional<std::string> http_post_with_headers(
-    const std::string& host, 
-    const std::string& path, 
-    const std::string& body,
-    const httplib::Headers& headers
-) {
-    try {
-        httplib::Client cli(host.c_str());
-        cli.set_connection_timeout(5);
-        cli.set_read_timeout(5);
-        
-        httplib::Headers final_headers = headers;
-        final_headers.emplace("Content-Type", "application/x-www-form-urlencoded");
-        
-        auto res = cli.Post(path.c_str(), final_headers, body, "application/x-www-form-urlencoded");
-        
-        if (!res) {
-            std::cerr << "HTTP POST failed: No response from " << host << path << std::endl;
-            return std::nullopt;
-        }
-        
-        if (res->status != 200) {
-            std::cerr << "HTTP POST failed: Status " << res->status 
-                      << " from " << host << path << std::endl;
-            std::cerr << "Response body: " << res->body << std::endl;
-            return std::nullopt;
-        }
-        
-        return res->body;
-        
-    } catch (const std::exception& e) {
-        std::cerr << "HTTP POST exception: " << e.what() << std::endl;
-        return std::nullopt;
-    }
-}
