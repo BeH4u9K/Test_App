@@ -1,5 +1,6 @@
 import redis
 import json
+import time
 from config import config
 
 class RedisClient:
@@ -19,7 +20,8 @@ class RedisClient:
     def set_login_data(self, chat_id: int, login_token: str):
         data = {
             "status": "anonim",
-            "login_token": login_token
+            "login_token": login_token,
+            "created_at": time.time()
         }
         key = f"user:{chat_id}"
         self.client.setex(key, 3600, json.dumps(data))
@@ -31,16 +33,22 @@ class RedisClient:
             user_data = json.loads(data)
             if user_data.get("status") == "anonim":
                 user_data["login_token"] = new_login_token
+                user_data["created_at"] = time.time()
                 self.client.setex(key, 3600, json.dumps(user_data))
                 return True
         return False
 
-    def set_authorized_user(self, chat_id: int, access_token: str, refresh_token: str):
+    def set_authorized_user(self, chat_id: int, access_token: str, refresh_token: str, user_id: str = None):
         data = {
             "status": "authorized",
             "access_token": access_token,
-            "refresh_token": refresh_token
+            "refresh_token": refresh_token,
+            "authorized_at": time.time()
         }
+        
+        if user_id:
+            data["user_id"] = user_id
+            
         key = f"user:{chat_id}"
         self.client.setex(key, 86400, json.dumps(data))
     

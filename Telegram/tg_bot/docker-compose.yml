@@ -3,7 +3,7 @@ services:
     image: redis:7-alpine
     container_name: telegram_redis
     ports:
-      - "6379:6379"  # Ключевое: пробрасываем Redis наружу для C++ сервера
+      - "6379:6379"
     networks:
       - bot-network
     restart: unless-stopped
@@ -12,7 +12,7 @@ services:
     image: nginx:alpine
     container_name: telegram_nginx
     ports:
-      - "8088:80"  # Внешний порт для доступа
+      - "8088:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -33,13 +33,16 @@ services:
     environment:
       REDIS_HOST: redis
       PORT: "8001"
-      AUTH_SERVICE_URL: "http://host.docker.internal:8080"  # Ключевое изменение!
+      # Используем host.docker.internal для доступа к хосту
+      AUTH_SERVICE_URL: "http://host.docker.internal:8080"
     depends_on:
       - redis
     networks:
       - bot-network
     restart: unless-stopped
     command: python bot_1.py
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   worker2:
     build: .
@@ -58,6 +61,8 @@ services:
       - bot-network
     restart: unless-stopped
     command: python bot_2.py
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   worker3:
     build: .
@@ -76,6 +81,8 @@ services:
       - bot-network
     restart: unless-stopped
     command: python bot_3.py
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   bot:
     build: .
@@ -84,6 +91,7 @@ services:
       - .env
     environment:
       REDIS_HOST: redis
+      AUTH_SERVICE_URL: "http://host.docker.internal:8080"
     depends_on:
       - nginx
       - redis
@@ -91,6 +99,8 @@ services:
       - bot-network
     restart: unless-stopped
     command: python main.py
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   bot-network:

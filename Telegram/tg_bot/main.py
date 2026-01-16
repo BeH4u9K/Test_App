@@ -41,7 +41,7 @@ async def forward_to_nginx(message: types.Message):
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer("Бот запущен, Отправьте любое сообщение.")
+    await message.answer("Отправьте любое сообщение.")
 
 @dp.message()
 async def handle_all_messages(message: types.Message):
@@ -49,7 +49,6 @@ async def handle_all_messages(message: types.Message):
     await forward_to_nginx(message)
 
 async def main():
-    logging.info("Бот запускается...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
