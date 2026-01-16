@@ -4,6 +4,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <functional>
 
 class SessionStorage {
 private:
@@ -31,7 +32,10 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = login_by_oauth_state_.find(oauth_state);
         if (it != login_by_oauth_state_.end()) {
-            return get_session_by_login(it->second);
+            auto session_it = sessions_by_login_.find(it->second);
+            if (session_it != sessions_by_login_.end()) {
+                return session_it->second;
+            }
         }
         return std::nullopt;
     }
@@ -39,6 +43,48 @@ public:
     void update_session(const AuthSession& session) {
         std::lock_guard<std::mutex> lock(mutex_);
         sessions_by_login_[session.login_token] = session;
+    }
+    
+    std::optional<AuthSession> get_and_update_session_by_oauth_state(
+        const std::string& oauth_state,
+        std::function<void(AuthSession&)> update_func
+    ) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = login_by_oauth_state_.find(oauth_state);
+        if (it == login_by_oauth_state_.end()) {
+            return std::nullopt;
+        }
+        
+        auto session_it = sessions_by_login_.find(it->second);
+        if (session_it == sessions_by_login_.end()) {
+            return std::nullopt;
+        }
+        
+        try {
+            update_func(session_it->second);
+            return session_it->second;
+        } catch (const std::exception& e) {
+            std::cerr << "Error updating session: " << e.what() << std::endl;
+            return std::nullopt;
+        }
+    }
+    
+    bool update_session_status_by_oauth_state(
+        const std::string& oauth_state,
+        AuthStatus new_status
+    ) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        auto it = login_by_oauth_state_.find(oauth_state);
+        if (it != login_by_oauth_state_.end()) {
+            auto session_it = sessions_by_login_.find(it->second);
+            if (session_it != sessions_by_login_.end()) {
+                session_it->second.status = new_status;
+                return true;
+            }
+        }
+        return false;
     }
     
     void remove_session_by_login(const std::string& login_token) {

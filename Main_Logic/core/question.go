@@ -12,28 +12,27 @@ import (
 
 // AnswerOption содержит информацию об одном варианте ответа
 type AnswerOption struct {
-	ID        int
-	Text      string
-	IsCorrect bool
+	ID        int    `json:"id"`
+	Text      string `json:"text"`
+	IsCorrect bool   `json:"is_correct"`
 }
 
 // Question содержит информацию о вопросе и его вариантах ответов
 type Question struct {
-	ID      int
-	RootID  int
-	TestID  int
-	Title   string
-	Text    string
-	Version int
-	Answers []AnswerOption
+	ID      int            `json:"id"`
+	RootID  int            `json:"root_id"`
+	TestID  int            `json:"test_id"`
+	Title   string         `json:"title"`
+	Text    string         `json:"text"`
+	Version int            `json:"version"`
+	Answers []AnswerOption `json:"answers"`
 }
 
 // QuestionListItem содержит краткую информацию о вопросе для списка
 type QuestionListItem struct {
-	ID      int
-	RootID  int
-	Title   string
-	Version int
+	ID      int    `json:"id"`
+	Title   string `json:"title"`
+	Version int    `json:"version"`
 }
 
 // Функции
@@ -43,7 +42,7 @@ func GetQuestions(disciplineID, testID int) ([]QuestionListItem, error) {
 
 	result := make([]QuestionListItem, 0)
 	query := `
-       SELECT q.id, q.root_id, q.title, q.version 
+       SELECT q.id, q.title, q.version 
        FROM question q
        INNER JOIN test t ON q.test_id = t.id
        WHERE q.test_id = $1 
@@ -66,7 +65,7 @@ func GetQuestions(disciplineID, testID int) ([]QuestionListItem, error) {
 
 	for rows.Next() {
 		var q QuestionListItem
-		if err := rows.Scan(&q.ID, &q.RootID, &q.Title, &q.Version); err != nil {
+		if err := rows.Scan(&q.ID, &q.Title, &q.Version); err != nil {
 			return nil, fmt.Errorf("scan error: %v", err)
 		}
 		result = append(result, q)

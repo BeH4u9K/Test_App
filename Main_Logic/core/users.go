@@ -161,25 +161,33 @@ func GetUserData(id int) (UserData, error) {
 	return result, nil
 }
 
+type Roles struct {
+	Roles []string `json:"roles"`
+}
+
 // GetUserRoles возвращает массив ролей пользователя
-func GetUserRoles(id int) ([]string, error) {
+func GetUserRoles(id int) (Roles, error) {
 	query := "SELECT role FROM user_role WHERE user_id = $1"
 	rows, err := storage.DB.Query(query, id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch roles: %v", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return Roles{}, fmt.Errorf("user with id %d not found", id)
+		}
+		return Roles{}, fmt.Errorf("failed to fetch roles: %v", err)
 	}
-	result := make([]string, 0)
 	defer rows.Close()
+	var result Roles
+	result.Roles = make([]string, 0)
 
 	for rows.Next() {
 		var r string
 		if err := rows.Scan(&r); err != nil {
-			return nil, fmt.Errorf("scan role error: %v", err)
+			return Roles{}, fmt.Errorf("scan role error: %v", err)
 		}
-		result = append(result, r)
+		result.Roles = append(result.Roles, r)
 	}
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows error: %v", err)
+		return Roles{}, fmt.Errorf("rows error: %v", err)
 	}
 
 	return result, nil
@@ -236,6 +244,62 @@ func ChangeBlockStatus(id int, blocked bool) error {
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("user with id %d does not exist", id)
+	}
+
+	return nil
+}
+
+type UserShort struct {
+	ID       int    `json:"id"`
+	FullName string `json:"full_name"`
+}
+
+func GetAllUsers() ([]UserShort, error) {
+	query := "SELECT id, full_name FROM users WHERE is_blocked = FALSE ORDER BY id"
+	rows, err := storage.DB.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("select users error: %v", err)
+	}
+
+	users := make([]UserShort, 0)
+
+	for rows.Next() {
+		var u UserShort
+		if err := rows.Scan(&u.ID, &u.FullName); err != nil {
+			return nil, fmt.Errorf("scan error: %v", err)
+		}
+		users = append(users, u)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows Err: %v", err)
+	}
+
+	return users, nil
+}
+
+func ChangeUserName(id int, newName string) error {
+	query := "UPDATE users SET full_name = $1 WHERE id = $2"
+	res, err := storage.DB.Exec(query, newName, id)
+	if err != nil {
+		return fmt.Errorf("change user name error: %v", err)
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("RowsAffected error: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		// Проверяем, существует ли пользователь
+		checkQuery := "SELECT id FROM users WHERE id = $1"
+		var existingID int
+		err := storage.DB.QueryRow(checkQuery, id).Scan(&existingID)
+
+		if err == sql.ErrNoRows {
+			// Пользователь не существует
+			return fmt.Errorf("User with id %d not found", id)
+		}
+
 	}
 
 	return nil

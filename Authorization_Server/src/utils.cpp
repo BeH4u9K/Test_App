@@ -2,6 +2,7 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
+#include <iostream>
 
 using namespace httplib;
 
@@ -30,29 +31,23 @@ std::optional<std::string> http_post(
     const std::string& content_type
 ) {
     Client cli(host);
-    cli.set_connection_timeout(5);
-    cli.set_read_timeout(5);
-
+    cli.set_connection_timeout(10);
+    cli.set_read_timeout(10);
+    
+    std::cout << "HTTP POST to: " << host << path << std::endl;
+    
     auto res = cli.Post(path.c_str(), body, content_type.c_str());
-    if (res && res->status == 200)
-        return res->body;
-
-    return std::nullopt;
-}
-
-std::optional<std::string> http_get_with_auth(
-    const std::string& host,
-    const std::string& path,
-    const std::string& token
-) {
-    Client cli(host);
-    cli.set_connection_timeout(5);
-    cli.set_read_timeout(5);
-    cli.set_bearer_token_auth(token.c_str());
-
-    auto res = cli.Get(path.c_str());
-    if (res && res->status == 200)
-        return res->body;
-
+    
+    if (res) {
+        std::cout << "Response status: " << res->status << std::endl;
+        if (res->status == 200) {
+            return res->body;
+        } else {
+            std::cerr << "Error response body: " << res->body << std::endl;
+        }
+    } else {
+        std::cerr << "ERROR: No response from server " << host << std::endl;
+    }
+    
     return std::nullopt;
 }
