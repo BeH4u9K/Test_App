@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"net/mail"
-
 	"main_logic/storage"
+	"net/mail"
+	"time"
 )
 
 // Структуры для возврата информации о пользователе
@@ -34,8 +34,10 @@ var (
 
 // UserData содержит полную информацию о пользователе (курсы, тесты, оценки)
 type UserData struct {
-	UserName    string           `json:"user_name"`
-	Disciplines []UserDiscipline `json:"disciplines"`
+	Email              string           `json:"email"`
+	UserName           string           `json:"user_name"`
+	Disciplines        []UserDiscipline `json:"disciplines"`
+	TimeOfRegistration time.Time        `json:"time_of_registration"`
 }
 
 // Вспомогательная ф-ция для валидации почты
@@ -83,12 +85,40 @@ func RegisterUser(email string, fullName string) (int, error) {
 // GetUserData возвращает информацию о пользователе (курсы, тесты, оценки)
 func GetUserData(id int) (UserData, error) {
 
+	var timeOfRegistration time.Time
+
+	queryTime := "SELECT created_at FROM users WHERE id = $1"
+
+	row := storage.DB.QueryRow(queryTime, id)
+	if err := row.Scan(&timeOfRegistration); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return UserData{}, fmt.Errorf("User with id %d not found", id)
+		}
+		return UserData{}, fmt.Errorf("Scan error: %v", err)
+	}
+
+	queryEmail := "SELECT email FROM users WHERE id = $1"
+
+	var email string
+
+	row = storage.DB.QueryRow(queryEmail, id)
+	if err := row.Scan(&email); err != nil {
+
+		if errors.Is(err, sql.ErrNoRows) {
+			return UserData{}, fmt.Errorf("User with id %d not found", id)
+		}
+
+		return UserData{}, fmt.Errorf("Scan error: %v", err)
+	}
+
 	name, err := GetFullName(id)
 	if err != nil {
 		return UserData{}, fmt.Errorf("GetFullName error: %v", err)
 	}
 
 	var result UserData
+	result.TimeOfRegistration = timeOfRegistration
+	result.Email = email
 	result.Disciplines = make([]UserDiscipline, 0)
 
 	// 1. Собираем ID дисциплин пользователя
