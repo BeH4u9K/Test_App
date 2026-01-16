@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:18
+    container_name: test_app_logic_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: test_app_logic_utf8
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: main_logic_api
+    depends_on:
+      - db
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    restart: unless-stopped
+
+volumes:
+  db_data:
