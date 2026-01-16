@@ -2,15 +2,15 @@ package main
 
 import (
 	"database/sql"
+	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/rs/cors"
 	"log"
 	"main_logic/api"
 	"main_logic/storage"
 	"net/http"
 	"os"
-
-	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -31,6 +31,15 @@ func main() {
 
 	// Создаём роутеры, регистрируем хендлеры, запускаем сервер
 	r := mux.NewRouter()
+
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000"}, // Разрешенные origin'ы
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "Accept"},
+		AllowCredentials: true,
+		Debug:            true,
+	})
+
 	api.RegisterRoutes(r)
 	http.ListenAndServe(":8081", r)
 }
