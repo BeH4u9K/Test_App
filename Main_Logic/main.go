@@ -40,6 +40,8 @@ func main() {
 		Debug:            true,
 	})
 
+	handler := c.Handler(r)
+
 	api.RegisterRoutes(r)
-	http.ListenAndServe(":8081", r)
+	http.ListenAndServe(":8081", handler)
 }
