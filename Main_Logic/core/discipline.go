@@ -383,7 +383,19 @@ func RemoveUser(userID, disciplineID int) error {
 
 func CreateDiscipline(name, description string, teacher_id int) (int, error) {
 	if name == "" || description == "" {
-		return 0, fmt.Errorf("name and description cannot be empty")
+		return 0, fmt.Errorf("name or description cannot be empty")
+	}
+
+	// Проверка, нет ли уже дисциплины с таким именем
+	var existsDiscipline bool
+	checkQuery := `SELECT EXISTS(
+        SELECT 1 FROM discipline WHERE name = $1
+    );`
+	if err := storage.DB.QueryRow(checkQuery, name).Scan(&existsDiscipline); err != nil {
+		return 0, fmt.Errorf("failed to check discipline name: %v", err)
+	}
+	if existsDiscipline {
+		return 0, fmt.Errorf("discipline with name %s already exists", name)
 	}
 
 	exists, err := userExists(teacher_id)
@@ -396,8 +408,8 @@ func CreateDiscipline(name, description string, teacher_id int) (int, error) {
 
 	var id int
 	query := `INSERT INTO discipline(teacher_id, name, description)
-	VALUES ($1, $2, $3)
-	RETURNING id;`
+              VALUES ($1, $2, $3)
+              RETURNING id;`
 	row := storage.DB.QueryRow(query, teacher_id, name, description)
 	if err := row.Scan(&id); err != nil {
 		return 0, fmt.Errorf("failed to create discipline: %v", err)

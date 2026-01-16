@@ -32,5 +32,5 @@ func main() {
 	// Создаём роутеры, регистрируем хендлеры, запускаем сервер
 	r := mux.NewRouter()
 	api.RegisterRoutes(r)
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(":8081", r)
 }

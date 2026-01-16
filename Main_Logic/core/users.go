@@ -34,6 +34,7 @@ var (
 
 // UserData содержит полную информацию о пользователе (курсы, тесты, оценки)
 type UserData struct {
+	UserName    string           `json:"user_name"`
 	Disciplines []UserDiscipline `json:"disciplines"`
 }
 
@@ -51,6 +52,9 @@ func GetFullName(id int) (string, error) {
 	var res string
 
 	if err := storage.DB.QueryRow(query, id).Scan(&res); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("User with id %d not found", id)
+		}
 		return "", fmt.Errorf("scan error: %v", err)
 	}
 
@@ -78,6 +82,12 @@ func RegisterUser(email string, fullName string) (int, error) {
 
 // GetUserData возвращает информацию о пользователе (курсы, тесты, оценки)
 func GetUserData(id int) (UserData, error) {
+
+	name, err := GetFullName(id)
+	if err != nil {
+		return UserData{}, fmt.Errorf("GetFullName error: %v", err)
+	}
+
 	var result UserData
 	result.Disciplines = make([]UserDiscipline, 0)
 
@@ -157,7 +167,7 @@ func GetUserData(id int) (UserData, error) {
 		d.Tests = allTests
 		result.Disciplines = append(result.Disciplines, d)
 	}
-
+	result.UserName = name
 	return result, nil
 }
 
@@ -279,6 +289,11 @@ func GetAllUsers() ([]UserShort, error) {
 }
 
 func ChangeUserName(id int, newName string) error {
+
+	if newName == "" {
+		return fmt.Errorf("Name can't be empty")
+	}
+
 	query := "UPDATE users SET full_name = $1 WHERE id = $2"
 	res, err := storage.DB.Exec(query, newName, id)
 	if err != nil {

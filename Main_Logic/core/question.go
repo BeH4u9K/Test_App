@@ -39,8 +39,40 @@ type QuestionListItem struct {
 
 // GetQuestions возвращает список всех вопросов по ID теста (только последние версии, не удалённые)
 func GetQuestions(disciplineID, testID int) ([]QuestionListItem, error) {
-
 	result := make([]QuestionListItem, 0)
+
+	// Сначала проверяем, что дисциплина существует и не удалена
+	var disciplineIsDeleted bool
+	disciplineCheckQuery := `
+        SELECT is_deleted
+        FROM discipline
+        WHERE id = $1
+    `
+	err := storage.DB.QueryRow(disciplineCheckQuery, disciplineID).Scan(&disciplineIsDeleted)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("discipline with id %d not found", disciplineID)
+		}
+		return nil, fmt.Errorf("failed to check discipline status: %v", err)
+	}
+	if disciplineIsDeleted {
+		return nil, fmt.Errorf("discipline with id %d not found", disciplineID)
+	}
+
+	var isDeleted bool
+	checkQuery := `
+       SELECT is_deleted
+       FROM test
+       WHERE id = $1 AND discipline_id = $2
+    `
+	err = storage.DB.QueryRow(checkQuery, testID, disciplineID).Scan(&isDeleted)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check test status: %v", err)
+	}
+	if isDeleted {
+		return nil, fmt.Errorf("test with id %d not found or deleted", testID)
+	}
+
 	query := `
        SELECT q.id, q.title, q.version 
        FROM question q

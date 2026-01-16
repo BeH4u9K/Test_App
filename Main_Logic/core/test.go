@@ -465,7 +465,7 @@ func GetTest(disciplineID, testID int) (TestShort, error) {
 		return TestShort{}, fmt.Errorf("discipline not found")
 	}
 
-	query := "SELECT id, name FROM test WHERE discipline_id = $1 AND id = $2"
+	query := "SELECT id, name FROM test WHERE discipline_id = $1 AND id = $2 AND is_deleted = FALSE"
 
 	var t TestShort
 
