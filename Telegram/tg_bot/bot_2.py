@@ -2,51 +2,69 @@ import uvicorn
 import logging
 import uuid
 import aiohttp
+import asyncio
 from fastapi import FastAPI, Request
 from config import config
 from redis_client import redis_client
 
 app = FastAPI()
 
-async def call_auth_service(chat_id: int, login_token: str, auth_type: str = None):  # ИЗМЕНЕНО: добавлен параметр по умолчанию
-    """Вызов C++ Auth сервиса"""
+async def start_auth_service(login_token: str, auth_type: str):
+    """Запуск новой авторизации через C++ сервер"""
     try:
         async with aiohttp.ClientSession() as session:
-            params = {}
-            
-            if auth_type:
-                # новая авторизация
-                params = {
-                    "type": auth_type,
-                    "state": login_token,
-                    "chat_id": str(chat_id)
-                }
-            else:
-                # проверка существующего токена
-                params = {
-                    "action": "verify",  # НОВОЕ параметр action
-                    "state": login_token,
-                    "chat_id": str(chat_id)
-                }
+            # Вызываем /auth эндпоинт C++ сервера
+            params = {
+                "provider": auth_type,
+                "login_token": login_token
+            }
             
             async with session.get(
                 f"{config.AUTH_SERVICE_URL}/auth",
                 params=params,
                 timeout=10
             ) as resp:
-                return await resp.json()
+                if resp.status == 200:
+                    result = await resp.json()
+                    return result
+                else:
+                    logging.error(f"Auth service error: {resp.status}")
+                    return None
     except Exception as e:
-        logging.error(f"Auth service error: {e}")
-        return None  # ИЗМЕНЕНО возвращаем None вместо dict
+        logging.error(f"Auth service connection error: {e}")
+        return None
 
-# обработка анонимного пользователя
+async def check_auth_status(login_token: str):
+    """Проверка статуса авторизации через C++ сервер"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            params = {
+                "login_token": login_token
+            }
+            
+            async with session.get(
+                f"{config.AUTH_SERVICE_URL}/check",
+                params=params,
+                timeout=10
+            ) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+                else:
+                    logging.error(f"Check auth error: {resp.status}")
+                    return None
+    except Exception as e:
+        logging.error(f"Check auth connection error: {e}")
+        return None
+
+
+# Обработка анонимного пользователя
 async def handle_anonymous_user(chat_id: int, text: str, user_data: dict):
     """Обработка анонимного пользователя"""
     if text.startswith("/login"):
         parts = text.split()
         
         if len(parts) == 1:
-            # /login без параметров - проверяем текущий токен
+            # /login без параметров - проверяем текущий статус
             login_token = user_data.get("login_token")
             if not login_token:
                 redis_client.delete_user(chat_id)
@@ -54,66 +72,95 @@ async def handle_anonymous_user(chat_id: int, text: str, user_data: dict):
                     "response": "Вы не авторизованы. Выберите:\n/login github\n/login yandex\n/login code"
                 }
             
-            # Проверяем токен в модуле авторизации
-            auth_result = await call_auth_service(chat_id, login_token)
+            # Проверяем текущий статус
+            result = await check_auth_status(login_token)
             
-            if not auth_result:
-                # Ошибка связи с auth service
-                return {"response": "Ошибка сервера авторизации"}
+            if not result:
+                return {"response": "Ошибка подключения к серверу авторизации"}
             
-            auth_status = auth_result.get("status")
-            auth_message = auth_result.get("message", "")
+            status = result.get("status")
             
-            if auth_status == "token_not_found" or auth_status == "token_expired":
-                # Токен не найден или просрочен
-                redis_client.delete_user(chat_id)
-                return {
-                    "response": "Сессия истекла. Вы не авторизованы.\nВыберите:\n/login github\n/login yandex\n/login code"
-                }
-            
-            elif auth_status == "access_denied":
-                # Пользователь отказал в доступе
-                redis_client.delete_user(chat_id)
-                return {"response": "Авторизация отменена"}
-            
-            elif auth_status == "access_granted":
-                # Доступ предоставлен - получаем JWT токены
-                access_token = auth_result.get("access_token")
-                refresh_token = auth_result.get("refresh_token")
+            if status == "pending":
+                # Авторизация в процессе
+                expires_in = result.get("expires_in", 0)
+                auth_url = result.get("auth_url", "")
                 
-                if not access_token or not refresh_token:
-                    redis_client.delete_user(chat_id)
-                    return {"response": "Ошибка авторизации: отсутствуют токены"}
+                if auth_url:
+                    return {
+                        "response": f"Авторизация в процессе. Перейдите по ссылке:\n{auth_url}\n\nИли подождите, проверка через {expires_in} секунд."
+                    }
+                else:
+                    return {
+                        "response": f"Авторизация в процессе. Ожидайте... (осталось {expires_in} секунд)"
+                    }
+            
+            elif status == "granted":
+                # Авторизация успешна
+                access_token = result.get("access_token", "")
+                refresh_token = result.get("refresh_token", "")
+                user_id = result.get("user_id", "")
                 
                 # Сохраняем авторизованного пользователя
                 redis_client.set_authorized_user(chat_id, access_token, refresh_token)
                 
-                # Продолжаем как авторизованный пользователь
-                user_name = auth_result.get("user_name", "Пользователь")
-                return {"response": f"Добро пожаловать, {user_name}! Вы успешно авторизованы."}
+                return {
+                    "response": f"Добро пожаловать, {user_id}! Вы успешно авторизованы."
+                }
+            
+            elif status in ["denied", "expired", "not_found"]:
+                # Авторизация отклонена
+                redis_client.delete_user(chat_id)
+                return {
+                    "response": "Авторизация отклонена или сессия истекла. Используйте /login для повторной авторизации."
+                }
             
             else:
                 # Неизвестный статус
-                return {"response": f"Статус авторизации: {auth_status}\n{auth_message}"}
+                return {"response": f"Статус авторизации: {status}"}
         
         else:
-            # /login с параметром type - новая авторизация
+            # /login с параметром - новая авторизация
             auth_type = parts[1]
+            
+            if auth_type not in ["github", "yandex", "code"]:
+                return {"response": "Неподдерживаемый тип авторизации. Доступно: github, yandex, code"}
+            
+            # Генерируем новый login_token
             login_token = str(uuid.uuid4())
             
-            # Обновляем токен входа
-            success = redis_client.update_login_token(chat_id, login_token)
-            if not success:
-                # Если не удалось обновить, создаем новую запись
-                redis_client.set_login_data(chat_id, login_token)
+            # Сохраняем в Redis
+            redis_client.update_login_token(chat_id, login_token)
             
-            # Вызываем Auth сервис
-            auth_result = await call_auth_service(chat_id, login_token, auth_type)
+            # Запускаем авторизацию
+            auth_result = await start_auth_service(login_token, auth_type)
             
-            if auth_result:
-                return {"response": f"Авторизация {auth_type} начата\n{auth_result.get('message', '')}"}
+            if not auth_result:
+                return {"response": f"Ошибка запуска авторизации {auth_type}. Попробуйте позже."}
+            
+            if "error" in auth_result:
+                return {"response": f"Ошибка: {auth_result['error']}"}
+            
+            # Проверяем тип ответа
+            if auth_result.get("auth_type") == "code":
+                # Авторизация по коду
+                code = auth_result.get("code", "")
+                message = auth_result.get("message", "")
+                return {
+                    "response": f"Код для авторизации: {code}\n{message}"
+                }
             else:
-                return {"response": f"Авторизация {auth_type} начата\n(Сервер авторизации не отвечает)"}
+                # OAuth авторизация
+                auth_url = auth_result.get("auth_url", "")
+                oauth_state = auth_result.get("oauth_state", "")
+                
+                if auth_url:
+                    return {
+                        "response": f"Для авторизации через {auth_type} перейдите по ссылке:\n{auth_url}\n\nПосле авторизации используйте /login для проверки статуса."
+                    }
+                else:
+                    return {
+                        "response": f"Авторизация {auth_type} начата. Используйте /login для проверки статуса."
+                    }
     
     elif text.startswith("/"):
         return {"response": "Нет такой команды"}
@@ -122,7 +169,7 @@ async def handle_anonymous_user(chat_id: int, text: str, user_data: dict):
         # Любое другое сообщение от анонимного пользователя
         return {"response": "Вы не авторизованы. Используйте /login для авторизации"}
 
-# НОВАЯ ФУНКЦИЯ: обработка авторизованного пользователя
+# Обработка авторизованного пользователя
 async def handle_authorized_user(chat_id: int, text: str, user_data: dict):
     """Обработка авторизованного пользователя"""
     if text.startswith("/login"):
@@ -130,7 +177,7 @@ async def handle_authorized_user(chat_id: int, text: str, user_data: dict):
         
         if len(parts) == 1:
             # /login без параметров - показываем статус
-            return {"response": f"Вы уже авторизованы\n статус: {user_data.get('status')}"}
+            return {"response": f"Вы уже авторизованы.\nСтатус: {user_data.get('status', 'authorized')}"}
         
         else:
             # /login с параметром - повторная авторизация
@@ -140,30 +187,67 @@ async def handle_authorized_user(chat_id: int, text: str, user_data: dict):
             # Сохраняем как анонимного (переавторизация)
             redis_client.set_login_data(chat_id, login_token)
             
-            # Вызываем Auth сервис
-            auth_result = await call_auth_service(chat_id, login_token, auth_type)
+            # Запускаем новую авторизацию
+            auth_result = await start_auth_service(login_token, auth_type)
             
-            if auth_result:
-                return {"response": f"Переавторизация {auth_type} начата\n{auth_result.get('message', '')}"}
+            if not auth_result:
+                return {"response": f"Ошибка запуска авторизации {auth_type}"}
+            
+            if "auth_url" in auth_result:
+                return {"response": f"Переавторизация начата. Перейдите по ссылке:\n{auth_result['auth_url']}"}
+            elif "code" in auth_result:
+                return {"response": f"Код для авторизации: {auth_result['code']}"}
             else:
-                return {"response": f"Переавторизация {auth_type} начата\n(Сервер авторизации не отвечает)"}
+                return {"response": f"Переавторизация {auth_type} начата."}
     
-    elif text.startswith("/logout"):  # НОВАЯ КОМАНДА
+    elif text.startswith("/logout"):
         # Выход из системы
         redis_client.delete_user(chat_id)
         return {"response": "Вы вышли из системы"}
     
-    elif text.startswith("/status"):  # НОВАЯ КОМАНДА
+    elif text.startswith("/status"):
         # Показать статус
-        authorized_at = user_data.get("authorized_at", "неизвестно")
-        return {"response": f"Статус: авторизован\nДата авторизации: {authorized_at}"}
+        access_token = user_data.get("access_token", "неизвестно")
+        status = user_data.get("status", "authorized")
+        return {"response": f"Статус: {status}\nAccess token: {access_token[:20]}..."}
+    
+    elif text.startswith("/refresh"):
+        # Обновление токена
+        refresh_token = user_data.get("refresh_token", "")
+        
+        if not refresh_token:
+            return {"response": "Refresh token не найден"}
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                data = {"refresh_token": refresh_token}
+                
+                async with session.post(
+                    f"{config.AUTH_SERVICE_URL}/refresh",
+                    json=data,
+                    timeout=10
+                ) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        new_access = result.get("access_token", "")
+                        new_refresh = result.get("refresh_token", "")
+                        
+                        # Обновляем токены
+                        redis_client.set_authorized_user(chat_id, new_access, new_refresh)
+                        
+                        return {"response": "Токены успешно обновлены"}
+                    else:
+                        return {"response": "Ошибка обновления токенов"}
+        except Exception as e:
+            logging.error(f"Refresh error: {e}")
+            return {"response": "Ошибка подключения"}
     
     elif text.startswith("/"):
         return {"response": "Нет такой команды"}
     
     else:
         # Любое другое сообщение от авторизованного пользователя
-        return {"response": f"Получено: '{text}'\nВы авторизованы"}
+        return {"response": f"Получено сообщение: '{text}'\nВы авторизованы."}
 
 @app.post("/handle")
 async def handle_message(request: Request):
@@ -172,40 +256,64 @@ async def handle_message(request: Request):
     chat_id = data.get("chat_id")
     text = data.get("text", "").strip()
     
-    logging.info(f"Worker 8001: chat_id={chat_id}, text='{text}'")
+    logging.info(f"Worker 8002: chat_id={chat_id}, text='{text}'")
     
     # Проверяем Redis
     user_data = redis_client.get_user_data(chat_id)
     
     if not user_data:
-        # Неизвестный пользователь (старый код с небольшими изменениями)
+        # Неизвестный пользователь
         if text.startswith("/login"):
             parts = text.split()
             
             if len(parts) == 1:
                 return {
-                    "response": "Вы не авторизованы. Выберите:\n/login github\n/login yandex\n/login code"
+                    "response": "Добро пожаловать! Вы не авторизованы.\nВыберите тип авторизации:\n/login github\n/login yandex\n/login code"
                 }
             else:
                 auth_type = parts[1]
+                
+                if auth_type not in ["github", "yandex", "code"]:
+                    return {"response": "Неподдерживаемый тип авторизации. Доступно: github, yandex, code"}
+                
+                # Генерируем login_token
                 login_token = str(uuid.uuid4())
                 
                 # Сохраняем в Redis
                 redis_client.set_login_data(chat_id, login_token)
                 
-                # Вызываем Auth сервис
-                auth_result = await call_auth_service(chat_id, login_token, auth_type)
+                # Запускаем авторизацию
+                auth_result = await start_auth_service(login_token, auth_type)
                 
-                if auth_result:
-                    return {"response": f"Авторизация {auth_type} начата\n{auth_result.get('message', '')}"}
+                if not auth_result:
+                    return {"response": f"Ошибка запуска авторизации {auth_type}"}
+                
+                if "error" in auth_result:
+                    return {"response": f"Ошибка: {auth_result['error']}"}
+                
+                # Формируем ответ
+                if auth_result.get("auth_type") == "code":
+                    code = auth_result.get("code", "")
+                    message = auth_result.get("message", "")
+                    return {
+                        "response": f"Код для авторизации: {code}\n{message}"
+                    }
                 else:
-                    return {"response": f"Авторизация {auth_type} начата\n(Сервер авторизации не отвечает)"}
+                    auth_url = auth_result.get("auth_url", "")
+                    if auth_url:
+                        return {
+                            "response": f"Для авторизации через {auth_type} перейдите по ссылке:\n{auth_url}\n\nПосле авторизации используйте /login для проверки статуса."
+                        }
+                    else:
+                        return {
+                            "response": f"Авторизация {auth_type} начата. Используйте /login для проверки статуса."
+                        }
         
         elif text.startswith("/"):
             return {"response": "Нет такой команды"}
         
         else:
-            return {"response": "Добро пожаловать! Используйте /login для авторизации"}
+            return {"response": "Добро пожаловать! Для начала работы используйте /login"}
     
     else:
         # Пользователь существует
