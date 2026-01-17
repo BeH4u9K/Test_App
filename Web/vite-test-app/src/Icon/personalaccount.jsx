@@ -8,6 +8,7 @@ import {
   ListItem, 
   ListItemButton, 
   ListItemText,
+  ListItemIcon,
   Typography,
   Paper,
   Avatar,
@@ -44,7 +45,16 @@ import {
   Checkbox,
   FormControlLabel,
   FormGroup,
-  Tooltip
+  Tooltip,
+  Menu,
+  MenuItem,
+  Switch,
+  FormControl,
+  InputLabel,
+  Select,
+  Radio,
+  RadioGroup,
+  FormLabel
 } from '@mui/material';
 import { grey, red, green, orange, blue } from '@mui/material/colors';
 import InfoIcon from '@mui/icons-material/Info';
@@ -79,6 +89,20 @@ import BookIcon from '@mui/icons-material/Book';
 import EmailIcon from '@mui/icons-material/Email';
 import PhoneIcon from '@mui/icons-material/Phone';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
+import PauseCircleOutlineIcon from '@mui/icons-material/PauseCircleOutline';
+import CreateIcon from '@mui/icons-material/Create';
+import UpdateIcon from '@mui/icons-material/Update';
+import PeopleIcon from '@mui/icons-material/People';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import GroupRemoveIcon from '@mui/icons-material/GroupRemove';
+import SearchIcon from '@mui/icons-material/Search';
+import ArchiveIcon from '@mui/icons-material/Archive';
+import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 
 const drawerWidth = 240;
 const API_BASE_URL = 'http://localhost:8081/api/v1';
@@ -206,6 +230,76 @@ function PersonalAccount() {
     error: ''
   });
 
+  // Состояние для проверки активности теста
+  const [testStateDialog, setTestStateDialog] = useState({
+    open: false,
+    disciplineId: null,
+    disciplineName: '',
+    testId: null,
+    testName: '',
+    isActive: false,
+    loading: false,
+    error: ''
+  });
+
+  // Состояние для активации/деактивации теста
+  const [activateTestDialog, setActivateTestDialog] = useState({
+    open: false,
+    disciplineId: null,
+    disciplineName: '',
+    testId: null,
+    testName: '',
+    currentActive: false,
+    newActive: false,
+    loading: false,
+    error: ''
+  });
+
+  // Состояние для добавления нового теста
+  const [addTestDialog, setAddTestDialog] = useState({
+    open: false,
+    disciplineId: null,
+    disciplineName: '',
+    testName: '',
+    description: '',
+    loading: false,
+    error: ''
+  });
+
+  // Состояние для удаления теста
+  const [deleteTestDialog, setDeleteTestDialog] = useState({
+    open: false,
+    disciplineId: null,
+    disciplineName: '',
+    testId: null,
+    testName: '',
+    loading: false,
+    error: ''
+  });
+
+  // Новые состояния для студентов дисциплины
+  const [disciplineStudentsDialog, setDisciplineStudentsDialog] = useState({
+    open: false,
+    disciplineId: null,
+    disciplineName: '',
+    students: [],
+    allStudents: [],
+    loading: false,
+    error: '',
+    searchTerm: '',
+    addStudentDialog: {
+      open: false,
+      studentId: '',
+      loading: false,
+      error: ''
+    }
+  });
+
+  // Меню действий для теста
+  const [testMenuAnchor, setTestMenuAnchor] = useState(null);
+  const [selectedTestForMenu, setSelectedTestForMenu] = useState(null);
+  const [selectedDisciplineForMenu, setSelectedDisciplineForMenu] = useState(null);
+
   // Детальная информация о дисциплине
   const [disciplineDetail, setDisciplineDetail] = useState(null);
 
@@ -215,6 +309,31 @@ function PersonalAccount() {
     message: '',
     severity: 'success',
   });
+
+  // Состояние для удаления дисциплины
+  const [deleteDisciplineDialog, setDeleteDisciplineDialog] = useState({
+    open: false,
+    disciplineId: null,
+    disciplineName: '',
+    loading: false,
+    error: ''
+  });
+
+  // Состояние для восстановления дисциплины
+  const [restoreDisciplineDialog, setRestoreDisciplineDialog] = useState({
+    open: false,
+    disciplineId: null,
+    disciplineName: '',
+    loading: false,
+    error: ''
+  });
+
+  // Флаг для показа удаленных дисциплин
+  const [showDeleted, setShowDeleted] = useState(false);
+
+  // Меню действий для дисциплины
+  const [disciplineMenuAnchor, setDisciplineMenuAnchor] = useState(null);
+  const [selectedDisciplineForAction, setSelectedDisciplineForAction] = useState(null);
 
   const userId = '1';
 
@@ -588,6 +707,427 @@ function PersonalAccount() {
     }
   };
 
+  // 5. Проверить активность теста
+  const fetchTestState = async (disciplineId, testId) => {
+    try {
+      setTestStateDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/state`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      setTestStateDialog(prev => ({
+        ...prev,
+        isActive: data.active || data.state === 'active' || false,
+        loading: false
+      }));
+      
+      return data;
+      
+    } catch (err) {
+      console.error('Ошибка загрузки статуса теста:', err);
+      setTestStateDialog(prev => ({ 
+        ...prev, 
+        error: err.message,
+        loading: false
+      }));
+      showSnackbar(`Ошибка загрузки статуса теста: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // 6. Активировать/деактивировать тест
+  const updateTestState = async (disciplineId, testId, active) => {
+    try {
+      setActivateTestDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/state`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          active: active
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обновляем список тестов в диалоге
+      if (disciplineTestsDialog.disciplineId === disciplineId) {
+        fetchDisciplineTests(disciplineId);
+      }
+      
+      showSnackbar(`Тест успешно ${active ? 'активирован' : 'деактивирован'}!`, 'success');
+      return data;
+      
+    } catch (err) {
+      console.error('Ошибка обновления статуса теста:', err);
+      setActivateTestDialog(prev => ({ ...prev, error: err.message }));
+      showSnackbar(`Ошибка обновления статуса теста: ${err.message}`, 'error');
+      throw err;
+    } finally {
+      setActivateTestDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // 7. Добавить новый тест в дисциплину
+  const addTestToDiscipline = async (disciplineId, testData) => {
+    try {
+      setAddTestDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обновляем список тестов в диалоге
+      if (disciplineTestsDialog.disciplineId === disciplineId) {
+        fetchDisciplineTests(disciplineId);
+      }
+      
+      showSnackbar('Тест успешно добавлен!', 'success');
+      return data;
+      
+    } catch (err) {
+      console.error('Ошибка добавления теста:', err);
+      setAddTestDialog(prev => ({ ...prev, error: err.message }));
+      showSnackbar(`Ошибка добавления теста: ${err.message}`, 'error');
+      throw err;
+    } finally {
+      setAddTestDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // 8. Удалить тест из дисциплины
+  const deleteTestFromDiscipline = async (disciplineId, testId) => {
+    try {
+      setDeleteTestDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обновляем список тестов в диалоге
+      if (disciplineTestsDialog.disciplineId === disciplineId) {
+        fetchDisciplineTests(disciplineId);
+      }
+      
+      showSnackbar('Тест успешно удален!', 'success');
+      return data;
+      
+    } catch (err) {
+      console.error('Ошибка удаления теста:', err);
+      setDeleteTestDialog(prev => ({ ...prev, error: err.message }));
+      showSnackbar(`Ошибка удаления теста: ${err.message}`, 'error');
+      throw err;
+    } finally {
+      setDeleteTestDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // ============= ФУНКЦИИ ДЛЯ СТУДЕНТОВ ДИСЦИПЛИНЫ =============
+
+  // 9. Получить список студентов дисциплины
+  const fetchDisciplineStudents = async (disciplineId) => {
+    try {
+      setDisciplineStudentsDialog(prev => ({ 
+        ...prev, 
+        loading: true, 
+        error: '',
+        students: []
+      }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/students`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Ответ от /students:', data);
+      
+      // Проверьте формат данных
+      if (!Array.isArray(data)) {
+        console.error('Ответ не является массивом:', typeof data, data);
+        throw new Error('Некорректный формат данных студентов');
+      }
+      
+      // Если данные уже содержат информацию о студентах
+      if (data.length > 0 && typeof data[0] === 'object' && data[0].id) {
+        // Формат: [{id: 1, name: "Иван", email: "ivan@example.com"}, ...]
+        const studentsWithDetails = data.map(student => ({
+          id: student.id,
+          name: student.full_name || student.name || student.user_name || 'Неизвестный',
+          email: student.email || student.mail || 'Не указан'
+        }));
+        
+        setDisciplineStudentsDialog(prev => ({
+          ...prev,
+          students: studentsWithDetails,
+          loading: false
+        }));
+        
+        return studentsWithDetails;
+      }
+      
+      // Если данные содержат только ID студентов
+      if (data.length > 0 && typeof data[0] === 'number' || typeof data[0] === 'string') {
+        // Формат: [1, 2, 3] или ["1", "2", "3"]
+        const studentsWithDetails = await Promise.all(
+          data.map(async (studentId) => {
+            try {
+              const studentResponse = await fetch(`${API_BASE_URL}/users/${studentId}`);
+              if (studentResponse.ok) {
+                const studentData = await studentResponse.json();
+                return {
+                  id: studentId,
+                  name: studentData.full_name || studentData.name || studentData.user_name || 'Неизвестный',
+                  email: studentData.email || studentData.mail || 'Не указан'
+                };
+              }
+              return {
+                id: studentId,
+                name: 'Неизвестный',
+                email: 'Не указан'
+              };
+            } catch (err) {
+              console.error(`Ошибка загрузки информации о студенте ${studentId}:`, err);
+              return {
+                id: studentId,
+                name: 'Ошибка загрузки',
+                email: '—'
+              };
+            }
+          })
+        );
+        
+        setDisciplineStudentsDialog(prev => ({
+          ...prev,
+          students: studentsWithDetails,
+          loading: false
+        }));
+        
+        return studentsWithDetails;
+      }
+      
+      throw new Error('Неизвестный формат данных студентов');
+      
+    } catch (err) {
+      console.error('Ошибка загрузки студентов дисциплины:', err);
+      setDisciplineStudentsDialog(prev => ({ 
+        ...prev, 
+        error: err.message,
+        loading: false
+      }));
+      showSnackbar(`Ошибка загрузки студентов: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // 10. Записать пользователя на дисциплину
+  const addStudentToDiscipline = async (disciplineId, studentId) => {
+    try {
+      setDisciplineStudentsDialog(prev => ({
+        ...prev,
+        addStudentDialog: { ...prev.addStudentDialog, loading: true, error: '' }
+      }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/students`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          student_id: studentId
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Обновляем список студентов
+      await fetchDisciplineStudents(disciplineId);
+      
+      showSnackbar('Пользователь успешно записан на дисциплину!', 'success');
+      return true;
+      
+    } catch (err) {
+      console.error('Ошибка записи пользователя на дисциплину:', err);
+      setDisciplineStudentsDialog(prev => ({
+        ...prev,
+        addStudentDialog: { ...prev.addStudentDialog, error: err.message, loading: false }
+      }));
+      showSnackbar(`Ошибка записи пользователя: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // 11. Отчислить пользователя с дисциплины
+  const removeStudentFromDiscipline = async (disciplineId, studentId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/users/${studentId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Обновляем список студентов
+      await fetchDisciplineStudents(disciplineId);
+      
+      showSnackbar('Пользователь успешно отчислен с дисциплины!', 'success');
+      return true;
+      
+    } catch (err) {
+      console.error('Ошибка отчисления пользователя с дисциплины:', err);
+      showSnackbar(`Ошибка отчисления пользователя: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // 12. Загрузить список всех пользователей для выбора
+  const fetchAllUsersForSelection = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const usersArray = Array.isArray(data) ? data : [];
+      
+      // Фильтруем только студентов (можно добавить дополнительную логику фильтрации)
+      const filteredUsers = usersArray.filter(user => 
+        !user.roles || 
+        user.roles.includes('student') || 
+        (!user.roles.includes('admin') && !user.roles.includes('teacher'))
+      );
+      
+      setDisciplineStudentsDialog(prev => ({
+        ...prev,
+        allStudents: filteredUsers.map(user => ({
+          id: user.id,
+          name: user.full_name || user.name || 'Неизвестный',
+          email: user.email || user.mail || 'Не указан'
+        }))
+      }));
+      
+      return filteredUsers;
+      
+    } catch (err) {
+      console.error('Ошибка загрузки пользователей для выбора:', err);
+      showSnackbar(`Ошибка загрузки пользователей: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // ============= ФУНКЦИИ ДЛЯ МЯГКОГО УДАЛЕНИЯ ДИСЦИПЛИНЫ =============
+
+  // 13. Отметить дисциплину как удаленную (мягкое удаление)
+  const deleteDiscipline = async (disciplineId) => {
+    try {
+      setDeleteDisciplineDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обновляем список дисциплин
+      setDisciplines(prev => 
+        prev.map(d => d.id === disciplineId ? { ...d, deleted: true } : d)
+      );
+      
+      // Закрываем все открытые диалоги для этой дисциплины
+      if (disciplineDialog.data?.id === disciplineId) {
+        handleCloseDisciplineDialog();
+      }
+      
+      showSnackbar('Дисциплина успешно удалена!', 'success');
+      return data;
+      
+    } catch (err) {
+      console.error('Ошибка удаления дисциплины:', err);
+      setDeleteDisciplineDialog(prev => ({ ...prev, error: err.message }));
+      showSnackbar(`Ошибка удаления дисциплины: ${err.message}`, 'error');
+      throw err;
+    } finally {
+      setDeleteDisciplineDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // 14. Восстановить дисциплину (отменить мягкое удаление)
+  const restoreDiscipline = async (disciplineId) => {
+    try {
+      setRestoreDisciplineDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/restore`, {
+        method: 'PUT',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обновляем список дисциплин
+      setDisciplines(prev => 
+        prev.map(d => d.id === disciplineId ? { ...d, deleted: false } : d)
+      );
+      
+      showSnackbar('Дисциплина успешно восстановлена!', 'success');
+      return data;
+      
+    } catch (err) {
+      console.error('Ошибка восстановления дисциплины:', err);
+      setRestoreDisciplineDialog(prev => ({ ...prev, error: err.message }));
+      showSnackbar(`Ошибка восстановления дисциплины: ${err.message}`, 'error');
+      throw err;
+    } finally {
+      setRestoreDisciplineDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
   // ============= ФУНКЦИИ ДЛЯ РЕДАКТИРОВАНИЯ ПОЛЬЗОВАТЕЛЕЙ =============
 
   // Изменение ФИО пользователя
@@ -813,6 +1353,259 @@ function PersonalAccount() {
     }
   };
 
+  // Новые обработчики для студентов дисциплины
+  const handleViewDisciplineStudents = async (discipline) => {
+    setDisciplineStudentsDialog({
+      open: true,
+      disciplineId: discipline.id,
+      disciplineName: discipline.name,
+      students: [],
+      allStudents: [],
+      loading: true,
+      error: '',
+      searchTerm: '',
+      addStudentDialog: {
+        open: false,
+        studentId: '',
+        loading: false,
+        error: ''
+      }
+    });
+    
+    try {
+      await fetchDisciplineStudents(discipline.id);
+      // Загружаем всех пользователей для выбора
+      await fetchAllUsersForSelection();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  const handleOpenAddStudentDialog = () => {
+    setDisciplineStudentsDialog(prev => ({
+      ...prev,
+      addStudentDialog: {
+        ...prev.addStudentDialog,
+        open: true,
+        studentId: '',
+        loading: false,
+        error: ''
+      }
+    }));
+  };
+
+  const handleCloseAddStudentDialog = () => {
+    setDisciplineStudentsDialog(prev => ({
+      ...prev,
+      addStudentDialog: {
+        ...prev.addStudentDialog,
+        open: false,
+        studentId: '',
+        loading: false,
+        error: ''
+      }
+    }));
+  };
+
+  const handleAddStudentToDiscipline = async () => {
+    const studentId = disciplineStudentsDialog.addStudentDialog.studentId;
+    
+    if (!studentId.trim()) {
+      showSnackbar('Выберите пользователя для записи', 'warning');
+      return;
+    }
+    
+    try {
+      await addStudentToDiscipline(
+        disciplineStudentsDialog.disciplineId,
+        studentId
+      );
+      handleCloseAddStudentDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  const handleRemoveStudentFromDiscipline = async (studentId) => {
+    if (!confirm(`Вы уверены, что хотите отчислить студента с ID ${studentId} с дисциплины?`)) {
+      return;
+    }
+    
+    try {
+      await removeStudentFromDiscipline(
+        disciplineStudentsDialog.disciplineId,
+        studentId
+      );
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Обработчик для проверки активности теста
+  const handleCheckTestState = async (discipline, test) => {
+    setTestStateDialog({
+      open: true,
+      disciplineId: discipline.id,
+      disciplineName: discipline.name,
+      testId: test.id,
+      testName: test.name || 'Без названия',
+      isActive: false,
+      loading: true,
+      error: ''
+    });
+    
+    try {
+      await fetchTestState(discipline.id, test.id);
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Обработчик для активации/деактивации теста
+  const handleActivateTestClick = (discipline, test) => {
+    setActivateTestDialog({
+      open: true,
+      disciplineId: discipline.id,
+      disciplineName: discipline.name,
+      testId: test.id,
+      testName: test.name || 'Без названия',
+      currentActive: test.state === 'active',
+      newActive: test.state !== 'active',
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Обработчик для добавления теста
+  const handleAddTestClick = (discipline) => {
+    setAddTestDialog({
+      open: true,
+      disciplineId: discipline.id,
+      disciplineName: discipline.name,
+      testName: '',
+      description: '',
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Обработчик для удаления теста
+  const handleDeleteTestClick = (discipline, test) => {
+    setDeleteTestDialog({
+      open: true,
+      disciplineId: discipline.id,
+      disciplineName: discipline.name,
+      testId: test.id,
+      testName: test.name || 'Без названия',
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Обработчики для мягкого удаления дисциплины
+  const handleDeleteDisciplineClick = (discipline) => {
+    setDeleteDisciplineDialog({
+      open: true,
+      disciplineId: discipline.id,
+      disciplineName: discipline.name,
+      loading: false,
+      error: ''
+    });
+  };
+
+  const handleRestoreDisciplineClick = (discipline) => {
+    setRestoreDisciplineDialog({
+      open: true,
+      disciplineId: discipline.id,
+      disciplineName: discipline.name,
+      loading: false,
+      error: ''
+    });
+  };
+
+  const handleConfirmDeleteDiscipline = async () => {
+    try {
+      await deleteDiscipline(deleteDisciplineDialog.disciplineId);
+      handleCloseDeleteDisciplineDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  const handleConfirmRestoreDiscipline = async () => {
+    try {
+      await restoreDiscipline(restoreDisciplineDialog.disciplineId);
+      handleCloseRestoreDisciplineDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Обработчики меню теста
+  const handleTestMenuOpen = (event, discipline, test) => {
+    setTestMenuAnchor(event.currentTarget);
+    setSelectedTestForMenu(test);
+    setSelectedDisciplineForMenu(discipline);
+  };
+
+  const handleTestMenuClose = () => {
+    setTestMenuAnchor(null);
+    setSelectedTestForMenu(null);
+    setSelectedDisciplineForMenu(null);
+  };
+
+  // Обработчики меню дисциплины
+  const handleDisciplineMenuOpen = (event, discipline) => {
+    setDisciplineMenuAnchor(event.currentTarget);
+    setSelectedDisciplineForAction(discipline);
+  };
+
+  const handleDisciplineMenuClose = () => {
+    setDisciplineMenuAnchor(null);
+    setSelectedDisciplineForAction(null);
+  };
+
+  const handleDisciplineMenuAction = (action) => {
+    if (selectedDisciplineForAction) {
+      switch (action) {
+        case 'view':
+          handleViewDisciplineClick(selectedDisciplineForAction);
+          break;
+        case 'tests':
+          handleViewDisciplineTests(selectedDisciplineForAction);
+          break;
+        case 'students':
+          handleViewDisciplineStudents(selectedDisciplineForAction);
+          break;
+        case 'delete':
+          if (selectedDisciplineForAction.deleted) {
+            handleRestoreDisciplineClick(selectedDisciplineForAction);
+          } else {
+            handleDeleteDisciplineClick(selectedDisciplineForAction);
+          }
+          break;
+      }
+    }
+    handleDisciplineMenuClose();
+  };
+
+  const handleTestMenuAction = (action) => {
+    if (selectedDisciplineForMenu && selectedTestForMenu) {
+      switch (action) {
+        case 'check':
+          handleCheckTestState(selectedDisciplineForMenu, selectedTestForMenu);
+          break;
+        case 'activate':
+          handleActivateTestClick(selectedDisciplineForMenu, selectedTestForMenu);
+          break;
+        case 'delete':
+          handleDeleteTestClick(selectedDisciplineForMenu, selectedTestForMenu);
+          break;
+      }
+    }
+    handleTestMenuClose();
+  };
+
   const handleSaveDiscipline = async () => {
     const { mode, data } = disciplineDialog;
     
@@ -847,6 +1640,51 @@ function PersonalAccount() {
       } catch (err) {
         // Ошибка уже обработана
       }
+    }
+  };
+
+  // Сохранение активации/деактивации теста
+  const handleSaveTestActivation = async () => {
+    try {
+      await updateTestState(
+        activateTestDialog.disciplineId,
+        activateTestDialog.testId,
+        activateTestDialog.newActive
+      );
+      handleCloseActivateTestDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Сохранение добавления теста
+  const handleSaveTestAddition = async () => {
+    if (!addTestDialog.testName.trim()) {
+      showSnackbar('Название теста не может быть пустым', 'warning');
+      return;
+    }
+    
+    try {
+      await addTestToDiscipline(addTestDialog.disciplineId, {
+        name: addTestDialog.testName.trim(),
+        description: addTestDialog.description?.trim() || ''
+      });
+      handleCloseAddTestDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Подтверждение удаления теста
+  const handleConfirmTestDeletion = async () => {
+    try {
+      await deleteTestFromDiscipline(
+        deleteTestDialog.disciplineId,
+        deleteTestDialog.testId
+      );
+      handleCloseDeleteTestDialog();
+    } catch (err) {
+      // Ошибка уже обработана
     }
   };
 
@@ -948,6 +1786,103 @@ function PersonalAccount() {
       disciplineId: null,
       disciplineName: '',
       tests: [],
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога студентов дисциплины
+  const handleCloseStudentsDialog = () => {
+    setDisciplineStudentsDialog({
+      open: false,
+      disciplineId: null,
+      disciplineName: '',
+      students: [],
+      allStudents: [],
+      loading: false,
+      error: '',
+      searchTerm: '',
+      addStudentDialog: {
+        open: false,
+        studentId: '',
+        loading: false,
+        error: ''
+      }
+    });
+  };
+
+  // Закрытие диалога проверки активности теста
+  const handleCloseTestStateDialog = () => {
+    setTestStateDialog({
+      open: false,
+      disciplineId: null,
+      disciplineName: '',
+      testId: null,
+      testName: '',
+      isActive: false,
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога активации теста
+  const handleCloseActivateTestDialog = () => {
+    setActivateTestDialog({
+      open: false,
+      disciplineId: null,
+      disciplineName: '',
+      testId: null,
+      testName: '',
+      currentActive: false,
+      newActive: false,
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога добавления теста
+  const handleCloseAddTestDialog = () => {
+    setAddTestDialog({
+      open: false,
+      disciplineId: null,
+      disciplineName: '',
+      testName: '',
+      description: '',
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога удаления теста
+  const handleCloseDeleteTestDialog = () => {
+    setDeleteTestDialog({
+      open: false,
+      disciplineId: null,
+      disciplineName: '',
+      testId: null,
+      testName: '',
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога удаления дисциплины
+  const handleCloseDeleteDisciplineDialog = () => {
+    setDeleteDisciplineDialog({
+      open: false,
+      disciplineId: null,
+      disciplineName: '',
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога восстановления дисциплины
+  const handleCloseRestoreDisciplineDialog = () => {
+    setRestoreDisciplineDialog({
+      open: false,
+      disciplineId: null,
+      disciplineName: '',
       loading: false,
       error: ''
     });
@@ -1107,6 +2042,47 @@ function PersonalAccount() {
     );
   };
 
+  // Проверка прав пользователя
+  const hasPermission = (permission) => {
+    // Здесь должна быть логика проверки прав пользователя
+    // Для демонстрации считаем, что у пользователя есть все права
+    return true;
+  };
+
+  // Фильтрация студентов по поисковому запросу
+  const getFilteredStudents = () => {
+    const { searchTerm, students } = disciplineStudentsDialog;
+    
+    if (!searchTerm.trim()) {
+      return students;
+    }
+    
+    const term = searchTerm.toLowerCase();
+    return students.filter(student =>
+      student.name.toLowerCase().includes(term) ||
+      student.email.toLowerCase().includes(term) ||
+      student.id.toString().includes(term)
+    );
+  };
+
+  // Получение списка дисциплин с учетом фильтра
+  const getFilteredDisciplines = () => {
+    if (showDeleted) {
+      // Показываем все дисциплины, включая удаленные
+      return disciplines;
+    } else {
+      // Показываем только активные дисциплины
+      return disciplines.filter(d => !d.deleted);
+    }
+  };
+
+  // Подсчет количества активных и удаленных дисциплин
+  const getDisciplineStats = () => {
+    const active = disciplines.filter(d => !d.deleted).length;
+    const deleted = disciplines.filter(d => d.deleted).length;
+    return { active, deleted };
+  };
+
   // Загрузка данных при переключении вкладок
   useEffect(() => {
     if (activeTab === 'Участники') {
@@ -1250,26 +2226,25 @@ function PersonalAccount() {
           {activeTab === 'Дисциплина' && (
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5">Список дисциплин</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button 
-                    variant="outlined" 
-                    onClick={fetchDisciplines}
-                    disabled={disciplinesLoading}
-                    startIcon={disciplinesLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
-                  >
-                    Обновить
-                  </Button>
-                  <Button 
-                    variant="contained" 
-                    startIcon={<AddIcon />}
-                    onClick={handleCreateDisciplineClick}
-                  >
-                    Создать дисциплину
-                  </Button>
-                </Box>
-              </Box>
-
+  <Typography variant="h5">Список дисциплин</Typography>
+  <Box sx={{ display: 'flex', gap: 1 }}>
+    <Button 
+      variant="outlined" 
+      onClick={fetchDisciplines}
+      disabled={disciplinesLoading}
+      startIcon={disciplinesLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+    >
+      Обновить
+    </Button>
+    <Button 
+      variant="contained" 
+      startIcon={<AddIcon />}
+      onClick={handleCreateDisciplineClick}
+    >
+      Создать дисциплину
+    </Button>
+  </Box>
+</Box>
               {disciplinesLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
                   <CircularProgress />
@@ -1282,31 +2257,46 @@ function PersonalAccount() {
                     Попробовать снова
                   </Button>
                 </Box>
-              ) : disciplines.length > 0 ? (
+              ) 
+              : getFilteredDisciplines().length > 0 ? (
                 <Grid container spacing={3}>
-                  {disciplines.map((discipline) => (
-                    <Grid item xs={12} md={6} lg={4} key={discipline.id}>
+                  {getFilteredDisciplines().map((discipline) => (
+                    <Grid item size={{ xs: 12, md: 6, lg: 4 }} key={discipline.id}>
                       <Card 
                         sx={{ 
                           height: '100%',
                           display: 'flex',
                           flexDirection: 'column',
                           transition: 'transform 0.2s, box-shadow 0.2s',
+                          opacity: discipline.deleted ? 0.7 : 1,
                           '&:hover': {
                             transform: 'translateY(-4px)',
-                            boxShadow: 6,
+                            boxShadow: discipline.deleted ? 2 : 6,
                           }
                         }}
                       >
                         <CardHeader
                           title={
-                            <Typography variant="h6" sx={{ 
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap'
-                            }}>
-                              {discipline.name}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="h6" sx={{ 
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                flex: 1
+                              }}>
+                                {discipline.name}
+                              </Typography>
+                              {discipline.deleted && (
+                                <Tooltip title="Дисциплина удалена">
+                                  <Chip
+                                    label="Удалена"
+                                    color="error"
+                                    size="small"
+                                    variant="outlined"
+                                  />
+                                </Tooltip>
+                              )}
+                            </Box>
                           }
                           subheader={
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1315,26 +2305,20 @@ function PersonalAccount() {
                             </Box>
                           }
                           avatar={
-                            <Avatar sx={{ bgcolor: 'primary.main' }}>
-                              <SchoolIcon />
+                            <Avatar sx={{ 
+                              bgcolor: discipline.deleted ? 'error.main' : 'primary.main' 
+                            }}>
+                              {discipline.deleted ? <ArchiveIcon /> : <SchoolIcon />}
                             </Avatar>
                           }
                           action={
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                              <Tooltip title="Просмотреть подробности">
+                              <Tooltip title="Дополнительные действия">
                                 <IconButton 
                                   size="small"
-                                  onClick={() => handleViewDisciplineClick(discipline)}
+                                  onClick={(e) => handleDisciplineMenuOpen(e, discipline)}
                                 >
-                                  <InfoIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Просмотреть тесты">
-                                <IconButton 
-                                  size="small"
-                                  onClick={() => handleViewDisciplineTests(discipline)}
-                                >
-                                  <QuizIcon />
+                                  <MoreVertIcon />
                                 </IconButton>
                               </Tooltip>
                             </Box>
@@ -1362,25 +2346,45 @@ function PersonalAccount() {
                           
                           <Box sx={{ mt: 'auto' }}>
                             <Divider sx={{ mb: 2 }} />
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                               <Button
                                 variant="outlined"
                                 size="small"
-                                startIcon={<InfoIcon />}
-                                onClick={() => handleViewDisciplineClick(discipline)}
-                                sx={{ flex: 1 }}
+                                startIcon={discipline.deleted ? <UnarchiveIcon /> : <InfoIcon />}
+                                onClick={() => {
+                                  if (discipline.deleted) {
+                                    handleRestoreDisciplineClick(discipline);
+                                  } else {
+                                    handleViewDisciplineClick(discipline);
+                                  }
+                                }}
+                                fullWidth
+                                color={discipline.deleted ? "success" : "primary"}
                               >
-                                Информация
+                                {discipline.deleted ? 'Восстановить' : 'Информация'}
                               </Button>
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={<QuizIcon />}
-                                onClick={() => handleViewDisciplineTests(discipline)}
-                                sx={{ flex: 1 }}
-                              >
-                                Тесты
-                              </Button>
+                              {!discipline.deleted && (
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<QuizIcon />}
+                                    onClick={() => handleViewDisciplineTests(discipline)}
+                                    sx={{ flex: 1 }}
+                                  >
+                                    Тесты
+                                  </Button>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={<PeopleIcon />}
+                                    onClick={() => handleViewDisciplineStudents(discipline)}
+                                    sx={{ flex: 1 }}
+                                  >
+                                    Студенты
+                                  </Button>
+                                </Box>
+                              )}
                             </Box>
                           </Box>
                         </CardContent>
@@ -1399,10 +2403,12 @@ function PersonalAccount() {
                 }}>
                   <SchoolIcon sx={{ fontSize: 60, mb: 2, opacity: 0.5 }} />
                   <Typography variant="h6" sx={{ mb: 1 }}>
-                    Дисциплины не найдены
+                    {showDeleted ? 'Удаленные дисциплины не найдены' : 'Дисциплины не найдены'}
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 3 }}>
-                    В системе пока нет зарегистрированных дисциплин
+                    {showDeleted 
+                      ? 'В архиве пока нет удаленных дисциплин'
+                      : 'В системе пока нет зарегистрированных дисциплин'}
                   </Typography>
                   <Button 
                     variant="contained" 
@@ -1412,12 +2418,21 @@ function PersonalAccount() {
                   >
                     Создать первую дисциплину
                   </Button>
-                  <Button 
-                    variant="outlined"
-                    onClick={fetchDisciplines}
-                  >
-                    Обновить список
-                  </Button>
+                  {showDeleted ? (
+                    <Button 
+                      variant="outlined"
+                      onClick={() => setShowDeleted(false)}
+                    >
+                      Показать активные
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outlined"
+                      onClick={fetchDisciplines}
+                    >
+                      Обновить список
+                    </Button>
+                  )}
                 </Box>
               )}
             </Paper>
@@ -1689,17 +2704,30 @@ function PersonalAccount() {
                   </Grid>
                   
                   <Grid item xs={12}>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      startIcon={<QuizIcon />}
-                      onClick={() => {
-                        handleCloseDisciplineDialog();
-                        handleViewDisciplineTests(disciplineDialog.data);
-                      }}
-                    >
-                      Просмотреть тесты дисциплины
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      <Button
+                        variant="contained"
+                        startIcon={<QuizIcon />}
+                        onClick={() => {
+                          handleCloseDisciplineDialog();
+                          handleViewDisciplineTests(disciplineDialog.data);
+                        }}
+                        sx={{ flex: 1 }}
+                      >
+                        Просмотреть тесты
+                      </Button>
+                      <Button
+                        variant="contained"
+                        startIcon={<PeopleIcon />}
+                        onClick={() => {
+                          handleCloseDisciplineDialog();
+                          handleViewDisciplineStudents(disciplineDialog.data);
+                        }}
+                        sx={{ flex: 1 }}
+                      >
+                        Просмотреть студентов
+                      </Button>
+                    </Box>
                   </Grid>
                 </Grid>
               ) : (
@@ -1748,16 +2776,18 @@ function PersonalAccount() {
         <DialogActions>
           {disciplineDialog.mode === 'view' ? (
             <>
-              <Button 
-                startIcon={<EditIcon />}
-                onClick={() => setDisciplineDialog(prev => ({
-                  ...prev,
-                  mode: 'edit'
-                }))}
-                variant="outlined"
-              >
-                Редактировать
-              </Button>
+              {!disciplineDialog.data?.deleted && (
+                <Button 
+                  startIcon={<EditIcon />}
+                  onClick={() => setDisciplineDialog(prev => ({
+                    ...prev,
+                    mode: 'edit'
+                  }))}
+                  variant="outlined"
+                >
+                  Редактировать
+                </Button>
+              )}
               <Button onClick={handleCloseDisciplineDialog}>Закрыть</Button>
             </>
           ) : (
@@ -1789,6 +2819,326 @@ function PersonalAccount() {
         </DialogActions>
       </Dialog>
 
+      {/* ДИАЛОГ СТУДЕНТОВ ДИСЦИПЛИНЫ */}
+      <Dialog 
+        open={disciplineStudentsDialog.open} 
+        onClose={handleCloseStudentsDialog} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <PeopleIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Студенты дисциплины: {disciplineStudentsDialog.disciplineName}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  ID дисциплины: {disciplineStudentsDialog.disciplineId}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Добавить студента">
+                <Button
+                  variant="contained"
+                  startIcon={<PersonAddIcon />}
+                  onClick={handleOpenAddStudentDialog}
+                >
+                  Добавить студента
+                </Button>
+              </Tooltip>
+              <IconButton onClick={handleCloseStudentsDialog} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {disciplineStudentsDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Загрузка студентов...</Typography>
+            </Box>
+          ) : disciplineStudentsDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {disciplineStudentsDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Поиск студентов */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Поиск студентов
+                </Typography>
+                <TextField
+                  value={disciplineStudentsDialog.searchTerm}
+                  onChange={(e) => setDisciplineStudentsDialog(prev => ({
+                    ...prev,
+                    searchTerm: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Поиск по имени, email или ID..."
+                  size="small"
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                  }}
+                />
+              </Box>
+              
+              {/* Список студентов */}
+              {getFilteredStudents().length > 0 ? (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>ID студента</TableCell>
+                        <TableCell>ФИО</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Действия</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {getFilteredStudents().map((student) => (
+                        <TableRow key={student.id} hover>
+                          <TableCell>{student.id}</TableCell>
+                          <TableCell>{student.name}</TableCell>
+                          <TableCell>{student.email}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Tooltip title="Просмотреть профиль">
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={<InfoIcon />}
+                                  onClick={() => {
+                                    handleCloseStudentsDialog();
+                                    handleViewUserClick(student.id);
+                                  }}
+                                >
+                                  Профиль
+                                </Button>
+                              </Tooltip>
+                              <Tooltip title="Отчислить с дисциплины">
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  color="error"
+                                  startIcon={<PersonRemoveIcon />}
+                                  onClick={() => handleRemoveStudentFromDiscipline(student.id)}
+                                >
+                                  Отчислить
+                                </Button>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box sx={{ 
+                  textAlign: 'center', 
+                  py: 8, 
+                  color: 'text.secondary',
+                  border: '2px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 2
+                }}>
+                  <PeopleIcon sx={{ fontSize: 60, mb: 2, opacity: 0.5 }} />
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    {disciplineStudentsDialog.searchTerm ? 
+                      'Студенты не найдены' : 
+                      'На этой дисциплине пока нет студентов'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 3 }}>
+                    {disciplineStudentsDialog.searchTerm ? 
+                      'Попробуйте изменить условия поиска' : 
+                      'Запишите первого студента на дисциплину'}
+                  </Typography>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<PersonAddIcon />}
+                    onClick={handleOpenAddStudentDialog}
+                  >
+                    Добавить студента
+                  </Button>
+                </Box>
+              )}
+              
+              {/* Статистика */}
+              {getFilteredStudents().length > 0 && (
+                <Box sx={{ 
+                  mt: 2, 
+                  p: 2, 
+                  bgcolor: 'info.main', 
+                  color: 'white', 
+                  borderRadius: 1 
+                }}>
+                  <Typography variant="body2">
+                    Всего студентов: {disciplineStudentsDialog.students.length}
+                    {disciplineStudentsDialog.searchTerm && 
+                      ` (Найдено: ${getFilteredStudents().length})`}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseStudentsDialog}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ ДОБАВЛЕНИЯ СТУДЕНТА НА ДИСЦИПЛИНУ */}
+      <Dialog 
+        open={disciplineStudentsDialog.addStudentDialog.open} 
+        onClose={handleCloseAddStudentDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'success.main' }}>
+                <PersonAddIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Запись студента на дисциплину
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {disciplineStudentsDialog.disciplineName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseAddStudentDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {disciplineStudentsDialog.addStudentDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Запись студента...</Typography>
+            </Box>
+          ) : disciplineStudentsDialog.addStudentDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {disciplineStudentsDialog.addStudentDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о дисциплине
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {disciplineStudentsDialog.disciplineName}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1">
+                      <strong>ID дисциплины:</strong> {disciplineStudentsDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Выберите студента для записи
+                </Typography>
+                
+                {/* Фильтрация студентов, которые еще не записаны на дисциплину */}
+                {disciplineStudentsDialog.allStudents.length > 0 ? (
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="student-select-label">Выберите студента</InputLabel>
+                    <Select
+                      labelId="student-select-label"
+                      value={disciplineStudentsDialog.addStudentDialog.studentId}
+                      label="Выберите студента"
+                      onChange={(e) => setDisciplineStudentsDialog(prev => ({
+                        ...prev,
+                        addStudentDialog: {
+                          ...prev.addStudentDialog,
+                          studentId: e.target.value
+                        }
+                      }))}
+                    >
+                      {disciplineStudentsDialog.allStudents
+                        .filter(student => 
+                          !disciplineStudentsDialog.students.some(s => s.id === student.id)
+                        )
+                        .map((student) => (
+                          <MenuItem key={student.id} value={student.id}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                              <Typography variant="body1">{student.name}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                ID: {student.id} • Email: {student.email}
+                              </Typography>
+                            </Box>
+                          </MenuItem>
+                        ))}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center', 
+                    color: 'text.secondary',
+                    border: '1px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 1
+                  }}>
+                    <Typography variant="body1">
+                      Нет доступных студентов для записи
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Информация
+                </Typography>
+                <Typography variant="body2">
+                  • Студент сможет проходить тесты по этой дисциплине<br />
+                  • Для студентов можно просматривать статистику прохождения<br />
+                  • Отчислить студента можно в любой момент
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddStudentDialog} disabled={disciplineStudentsDialog.addStudentDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleAddStudentToDiscipline}
+            variant="contained"
+            color="success"
+            disabled={disciplineStudentsDialog.addStudentDialog.loading || !disciplineStudentsDialog.addStudentDialog.studentId}
+            startIcon={<PersonAddIcon />}
+          >
+            {disciplineStudentsDialog.addStudentDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Записать студента'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* ДИАЛОГ ТЕСТОВ ДИСЦИПЛИНЫ */}
       <Dialog 
         open={disciplineTestsDialog.open} 
@@ -1811,9 +3161,23 @@ function PersonalAccount() {
                 </Typography>
               </Box>
             </Box>
-            <IconButton onClick={handleCloseTestsDialog} size="small">
-              <CloseIcon />
-            </IconButton>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Добавить тест">
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => handleAddTestClick({
+                    id: disciplineTestsDialog.disciplineId,
+                    name: disciplineTestsDialog.disciplineName
+                  })}
+                >
+                  Добавить тест
+                </Button>
+              </Tooltip>
+              <IconButton onClick={handleCloseTestsDialog} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
           </Box>
         </DialogTitle>
         
@@ -1837,6 +3201,7 @@ function PersonalAccount() {
                     <TableCell>Описание</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell>Дата создания</TableCell>
+                    <TableCell>Действия</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1861,6 +3226,41 @@ function PersonalAccount() {
                         {test.created_at ? 
                           new Date(test.created_at).toLocaleDateString() : '—'}
                       </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <Tooltip title="Проверить активность">
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<CheckCircleIcon />}
+                              onClick={() => handleCheckTestState(
+                                { 
+                                  id: disciplineTestsDialog.disciplineId, 
+                                  name: disciplineTestsDialog.disciplineName 
+                                }, 
+                                test
+                              )}
+                            >
+                              Проверить
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="Дополнительные действия">
+                            <IconButton
+                              size="small"
+                              onClick={(event) => handleTestMenuOpen(
+                                event,
+                                { 
+                                  id: disciplineTestsDialog.disciplineId, 
+                                  name: disciplineTestsDialog.disciplineName 
+                                },
+                                test
+                              )}
+                            >
+                              <MoreVertIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1875,6 +3275,16 @@ function PersonalAccount() {
               <Typography variant="body2" sx={{ mb: 3 }}>
                 В этой дисциплине пока нет созданных тестов
               </Typography>
+              <Button 
+                variant="contained" 
+                startIcon={<AddIcon />}
+                onClick={() => handleAddTestClick({
+                  id: disciplineTestsDialog.disciplineId,
+                  name: disciplineTestsDialog.disciplineName
+                })}
+              >
+                Добавить первый тест
+              </Button>
             </Box>
           )}
         </DialogContent>
@@ -1883,9 +3293,1291 @@ function PersonalAccount() {
         </DialogActions>
       </Dialog>
 
-      {/* Остальные диалоги (просмотр пользователя, редактирование ФИО, ролей, блокировки) */}
-      {/* Они остаются такими же как в оригинальном коде */}
-      
+      {/* МЕНЮ ДЕЙСТВИЙ ДЛЯ ДИСЦИПЛИНЫ */}
+      <Menu
+        anchorEl={disciplineMenuAnchor}
+        open={Boolean(disciplineMenuAnchor)}
+        onClose={handleDisciplineMenuClose}
+      >
+        {selectedDisciplineForAction && !selectedDisciplineForAction.deleted ? (
+          <>
+            <MenuItem onClick={() => handleDisciplineMenuAction('view')}>
+              <ListItemIcon>
+                <InfoIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Просмотреть информацию</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleDisciplineMenuAction('tests')}>
+              <ListItemIcon>
+                <QuizIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Просмотреть тесты</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => handleDisciplineMenuAction('students')}>
+              <ListItemIcon>
+                <PeopleIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Просмотреть студентов</ListItemText>
+            </MenuItem>
+            <Divider />
+            <MenuItem onClick={() => handleDisciplineMenuAction('delete')}>
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" color="error" />
+              </ListItemIcon>
+              <ListItemText sx={{ color: 'error.main' }}>Удалить дисциплину</ListItemText>
+            </MenuItem>
+          </>
+        ) : (
+          <MenuItem onClick={() => handleDisciplineMenuAction('delete')}>
+            <ListItemIcon>
+              <UnarchiveIcon fontSize="small" color="success" />
+            </ListItemIcon>
+            <ListItemText sx={{ color: 'success.main' }}>Восстановить дисциплину</ListItemText>
+          </MenuItem>
+        )}
+      </Menu>
+
+      {/* МЕНЮ ДЕЙСТВИЙ ДЛЯ ТЕСТА */}
+      <Menu
+        anchorEl={testMenuAnchor}
+        open={Boolean(testMenuAnchor)}
+        onClose={handleTestMenuClose}
+      >
+        <MenuItem onClick={() => handleTestMenuAction('check')}>
+          <ListItemIcon>
+            <CheckCircleIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Проверить активность</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleTestMenuAction('activate')}>
+          <ListItemIcon>
+            {selectedTestForMenu?.state === 'active' ? 
+              <PauseCircleOutlineIcon fontSize="small" /> : 
+              <PlayCircleOutlineIcon fontSize="small" />
+            }
+          </ListItemIcon>
+          <ListItemText>
+            {selectedTestForMenu?.state === 'active' ? 'Деактивировать' : 'Активировать'}
+          </ListItemText>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => handleTestMenuAction('delete')}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText sx={{ color: 'error.main' }}>Удалить тест</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* ДИАЛОГ ПРОВЕРКИ АКТИВНОСТИ ТЕСТА */}
+      <Dialog 
+        open={testStateDialog.open} 
+        onClose={handleCloseTestStateDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: testStateDialog.isActive ? 'success.main' : 'warning.main' }}>
+                <QuizIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Статус теста
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {testStateDialog.testName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseTestStateDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {testStateDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Проверка статуса...</Typography>
+            </Box>
+          ) : testStateDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {testStateDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о тесте
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {testStateDialog.disciplineName}
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>ID дисциплины:</strong> {testStateDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Тест:</strong> {testStateDialog.testName}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>ID теста:</strong> {testStateDialog.testId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Статус теста
+                </Typography>
+                <Box sx={{ 
+                  p: 3, 
+                  borderRadius: 2,
+                  border: '2px solid',
+                  borderColor: testStateDialog.isActive ? 'success.main' : 'warning.main',
+                  bgcolor: testStateDialog.isActive ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)',
+                  textAlign: 'center'
+                }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    {testStateDialog.isActive ? (
+                      <>
+                        <CheckCircleIcon sx={{ fontSize: 60, color: 'success.main' }} />
+                        <Typography variant="h5" color="success.main">
+                          Тест активен
+                        </Typography>
+                        <Typography variant="body1">
+                          Тест можно пройти
+                        </Typography>
+                      </>
+                    ) : (
+                      <>
+                        <WarningIcon sx={{ fontSize: 60, color: 'warning.main' }} />
+                        <Typography variant="h5" color="warning.main">
+                          Тест неактивен
+                        </Typography>
+                        <Typography variant="body1">
+                          Тест отображается в списке, но пройти его нельзя
+                        </Typography>
+                      </>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+              
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Что это значит?
+                </Typography>
+                <Typography variant="body2">
+                  {testStateDialog.isActive 
+                    ? 'Активный тест доступен для прохождения студентами. Его можно использовать для проверки знаний.'
+                    : 'Неактивный тест виден в списке тестов дисциплины, но студенты не могут его пройти. Это может быть черновик или архивный тест.'}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseTestStateDialog}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ АКТИВАЦИИ/ДЕАКТИВАЦИИ ТЕСТА */}
+      <Dialog 
+        open={activateTestDialog.open} 
+        onClose={handleCloseActivateTestDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: activateTestDialog.newActive ? 'success.main' : 'warning.main' }}>
+                {activateTestDialog.newActive ? <PlayCircleOutlineIcon /> : <PauseCircleOutlineIcon />}
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  {activateTestDialog.newActive ? 'Активация теста' : 'Деактивация теста'}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {activateTestDialog.testName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseActivateTestDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {activateTestDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Выполнение...</Typography>
+            </Box>
+          ) : activateTestDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {activateTestDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о тесте
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {activateTestDialog.disciplineName}
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>ID дисциплины:</strong> {activateTestDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Тест:</strong> {activateTestDialog.testName}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>ID теста:</strong> {activateTestDialog.testId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Текущий статус
+                </Typography>
+                <Box sx={{ 
+                  p: 2, 
+                  borderRadius: 1,
+                  border: '1px solid',
+                  borderColor: activateTestDialog.currentActive ? 'success.main' : 'warning.main',
+                  bgcolor: activateTestDialog.currentActive ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)',
+                  mb: 2
+                }}>
+                  <Typography variant="body1">
+                    <strong>Текущий статус:</strong> {activateTestDialog.currentActive ? 'Активен' : 'Неактивен'}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Новый статус
+                </Typography>
+                <FormControl component="fieldset">
+                  <RadioGroup
+                    value={activateTestDialog.newActive}
+                    onChange={(e) => setActivateTestDialog(prev => ({
+                      ...prev,
+                      newActive: e.target.value === 'true'
+                    }))}
+                  >
+                    <FormControlLabel 
+                      value={true} 
+                      control={<Radio />} 
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <PlayCircleOutlineIcon color="success" />
+                          <Typography>Активировать тест</Typography>
+                        </Box>
+                      } 
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ ml: 4, mb: 1 }}>
+                      Тест будет доступен для прохождения студентами
+                    </Typography>
+                    
+                    <FormControlLabel 
+                      value={false} 
+                      control={<Radio />} 
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <PauseCircleOutlineIcon color="warning" />
+                          <Typography>Деактивировать тест</Typography>
+                        </Box>
+                      } 
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+                      Тест будет отображаться в списке, но пройти его нельзя. Все начатые попытки автоматически завершатся.
+                    </Typography>
+                  </RadioGroup>
+                </FormControl>
+              </Box>
+              
+              {!activateTestDialog.newActive && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'warning.main', color: 'white', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <WarningIcon /> Важно!
+                  </Typography>
+                  <Typography variant="body2">
+                    При деактивации теста все начатые попытки автоматически отмечаются как завершённые.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseActivateTestDialog} disabled={activateTestDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveTestActivation}
+            variant="contained"
+            color={activateTestDialog.newActive ? "success" : "warning"}
+            disabled={activateTestDialog.loading || activateTestDialog.currentActive === activateTestDialog.newActive}
+          >
+            {activateTestDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : activateTestDialog.newActive ? (
+              'Активировать'
+            ) : (
+              'Деактивировать'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ ДОБАВЛЕНИЯ ТЕСТА */}
+      <Dialog 
+        open={addTestDialog.open} 
+        onClose={handleCloseAddTestDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <AddIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Добавление теста
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Дисциплина: {addTestDialog.disciplineName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseAddTestDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {addTestDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Создание теста...</Typography>
+            </Box>
+          ) : addTestDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {addTestDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о дисциплине
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {addTestDialog.disciplineName}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1">
+                      <strong>ID дисциплины:</strong> {addTestDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Название теста *
+                </Typography>
+                <TextField
+                  value={addTestDialog.testName}
+                  onChange={(e) => setAddTestDialog(prev => ({
+                    ...prev,
+                    testName: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Введите название теста"
+                  size="small"
+                  autoFocus
+                  error={!addTestDialog.testName.trim()}
+                  helperText={!addTestDialog.testName.trim() ? "Название теста не может быть пустым" : ""}
+                />
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Описание теста
+                </Typography>
+                <TextField
+                  value={addTestDialog.description}
+                  onChange={(e) => setAddTestDialog(prev => ({
+                    ...prev,
+                    description: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Введите описание теста"
+                  size="small"
+                  multiline
+                  rows={4}
+                />
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Информация
+                </Typography>
+                <Typography variant="body2">
+                  Новый тест будет создан с пустым списком вопросов. По умолчанию тест будет не активен.
+                  После создания вы сможете добавить вопросы и активировать тест.
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddTestDialog} disabled={addTestDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveTestAddition}
+            variant="contained"
+            disabled={addTestDialog.loading || !addTestDialog.testName.trim()}
+          >
+            {addTestDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Создать тест'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ УДАЛЕНИЯ ТЕСТА */}
+      <Dialog 
+        open={deleteTestDialog.open} 
+        onClose={handleCloseDeleteTestDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'error.main' }}>
+                <DeleteIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Удаление теста
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {deleteTestDialog.testName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseDeleteTestDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {deleteTestDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Удаление теста...</Typography>
+            </Box>
+          ) : deleteTestDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {deleteTestDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о тесте
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {deleteTestDialog.disciplineName}
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>ID дисциплины:</strong> {deleteTestDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Тест:</strong> {deleteTestDialog.testName}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>ID теста:</strong> {deleteTestDialog.testId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <WarningIcon /> Внимание!
+                </Typography>
+                <Typography variant="body2">
+                  Вы собираетесь удалить тест. Это действие нельзя отменить.
+                </Typography>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Важная информация
+                </Typography>
+                <Typography variant="body2">
+                  • Тест будет отмечен как удалённый (реально ничего не удаляется)<br />
+                  • Все оценки за этот тест перестанут отображаться, но тоже не удалятся<br />
+                  • Тест можно будет восстановить через административный интерфейс
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Подтверждение удаления
+                </Typography>
+                <Typography variant="body2">
+                  Для подтверждения удаления введите название теста:
+                </Typography>
+                <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace', textAlign: 'center' }}>
+                    {deleteTestDialog.testName}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Убедитесь, что вы удаляете правильный тест
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteTestDialog} disabled={deleteTestDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleConfirmTestDeletion}
+            variant="contained"
+            color="error"
+            disabled={deleteTestDialog.loading}
+          >
+            {deleteTestDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Удалить тест'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ УДАЛЕНИЯ ДИСЦИПЛИНЫ */}
+      <Dialog 
+        open={deleteDisciplineDialog.open} 
+        onClose={handleCloseDeleteDisciplineDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'error.main' }}>
+                <ArchiveIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Удаление дисциплины
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {deleteDisciplineDialog.disciplineName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseDeleteDisciplineDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {deleteDisciplineDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Удаление дисциплины...</Typography>
+            </Box>
+          ) : deleteDisciplineDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {deleteDisciplineDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о дисциплине
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {deleteDisciplineDialog.disciplineName}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1">
+                      <strong>ID дисциплины:</strong> {deleteDisciplineDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <WarningIcon /> Внимание!
+                </Typography>
+                <Typography variant="body2">
+                  Вы собираетесь удалить дисциплину. Это действие нельзя отменить.
+                </Typography>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Важная информация о мягком удалении
+                </Typography>
+                <Typography variant="body2">
+                  • Дисциплина будет отмечена как удалённая (реально ничего не удаляется)<br />
+                  • Все тесты и оценки перестанут отображаться, но тоже не удаляются<br />
+                  • Студенты останутся записанными, но не смогут просматривать дисциплину<br />
+                  • Дисциплину можно будет восстановить через меню "Показать удаленные"
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Последствия удаления
+                </Typography>
+                <Alert severity="warning">
+                  После удаления дисциплины:
+                  <ul>
+                    <li>Студенты не смогут проходить тесты по этой дисциплине</li>
+                    <li>Статистика и результаты сохранятся, но будут скрыты</li>
+                    <li>Преподаватели не смогут добавлять новые тесты</li>
+                    <li>Дисциплина переместится в архив</li>
+                  </ul>
+                </Alert>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Подтверждение удаления
+                </Typography>
+                <Typography variant="body2">
+                  Для подтверждения удаления введите название дисциплины:
+                </Typography>
+                <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace', textAlign: 'center' }}>
+                    {deleteDisciplineDialog.disciplineName}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Убедитесь, что вы удаляете правильную дисциплину
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDisciplineDialog} disabled={deleteDisciplineDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleConfirmDeleteDiscipline}
+            variant="contained"
+            color="error"
+            disabled={deleteDisciplineDialog.loading}
+          >
+            {deleteDisciplineDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Удалить дисциплину'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ ВОССТАНОВЛЕНИЯ ДИСЦИПЛИНЫ */}
+      <Dialog 
+        open={restoreDisciplineDialog.open} 
+        onClose={handleCloseRestoreDisciplineDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'success.main' }}>
+                <UnarchiveIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Восстановление дисциплины
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {restoreDisciplineDialog.disciplineName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseRestoreDisciplineDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {restoreDisciplineDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Восстановление дисциплины...</Typography>
+            </Box>
+          ) : restoreDisciplineDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {restoreDisciplineDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о дисциплине
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {restoreDisciplineDialog.disciplineName}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1">
+                      <strong>ID дисциплины:</strong> {restoreDisciplineDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'success.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Информация о восстановлении
+                </Typography>
+                <Typography variant="body2">
+                  • Дисциплина будет восстановлена из архива<br />
+                  • Все тесты и оценки снова станут доступны<br />
+                  • Студенты смогут продолжить обучение<br />
+                  • Преподаватели смогут добавлять новые тесты
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Что произойдет после восстановления
+                </Typography>
+                <Alert severity="info">
+                  После восстановления дисциплины:
+                  <ul>
+                    <li>Дисциплина снова появится в основном списке</li>
+                    <li>Все тесты и задания станут доступны</li>
+                    <li>Студенты смогут проходить тесты и просматривать результаты</li>
+                    <li>Преподаватели смогут управлять дисциплиной как обычно</li>
+                  </ul>
+                </Alert>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Подтверждение восстановления
+                </Typography>
+                <Typography variant="body2">
+                  Для подтверждения восстановления введите название дисциплины:
+                </Typography>
+                <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace', textAlign: 'center' }}>
+                    {restoreDisciplineDialog.disciplineName}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Убедитесь, что вы восстанавливаете правильную дисциплину
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseRestoreDisciplineDialog} disabled={restoreDisciplineDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleConfirmRestoreDiscipline}
+            variant="contained"
+            color="success"
+            disabled={restoreDisciplineDialog.loading}
+          >
+            {restoreDisciplineDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Восстановить дисциплину'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ ПРОСМОТРА ПОЛЬЗОВАТЕЛЯ */}
+      <Dialog 
+        open={openUserDialog} 
+        onClose={handleCloseViewDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                {selectedUserInfo?.full_name?.charAt(0)?.toUpperCase() || '?'}
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  {selectedUserInfo?.full_name || selectedUserInfo?.name || 'Пользователь'}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  ID: {selectedUserId}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseViewDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {userInfoLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Загрузка информации...</Typography>
+            </Box>
+          ) : userInfoError ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {userInfoError}</Typography>
+            </Box>
+          ) : selectedUserInfo ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Основная информация
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>ФИО:</strong> {selectedUserInfo.full_name || selectedUserInfo.name || 'Не указано'}
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Email:</strong> {selectedUserInfo.email || selectedUserInfo.mail || 'Не указан'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>ID:</strong> {selectedUserInfo.id}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>Статус:</strong> {selectedUserInfo.blocked ? 'Заблокирован' : 'Активен'}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Роли пользователя
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {selectedUserInfo.roles && selectedUserInfo.roles.length > 0 ? (
+                    selectedUserInfo.roles.map((role, index) => {
+                      const RoleIcon = getRoleIcon(role);
+                      return (
+                        <Chip
+                          key={index}
+                          label={role}
+                          icon={RoleIcon}
+                          size="medium"
+                          color={getRoleChipColor(role)}
+                          variant="outlined"
+                        />
+                      );
+                    })
+                  ) : (
+                    <Chip label="Без ролей" size="medium" color="default" />
+                  )}
+                </Box>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Дополнительная информация
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Здесь может отображаться дополнительная информация о пользователе: дата регистрации, последний вход, и т.д.
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <Typography>Данные пользователя не загружены</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseViewDialog}>
+            Закрыть
+          </Button>
+          {selectedUserInfo && (
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                onClick={handleEditFromDialog}
+              >
+                Изменить ФИО
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<SecurityIcon />}
+                onClick={handleEditRolesFromDialog}
+              >
+                Изменить роли
+              </Button>
+              <Button
+                variant="outlined"
+                color={selectedUserInfo.blocked ? "success" : "error"}
+                startIcon={selectedUserInfo.blocked ? <LockOpenIcon /> : <LockIcon />}
+                onClick={handleBlockFromDialog}
+              >
+                {selectedUserInfo.blocked ? 'Разблокировать' : 'Заблокировать'}
+              </Button>
+            </Stack>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ РЕДАКТИРОВАНИЯ ФИО */}
+      <Dialog 
+        open={openEditDialog} 
+        onClose={handleCloseEditDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <EditIcon />
+              </Avatar>
+              <Typography variant="h6">
+                Изменение ФИО пользователя
+              </Typography>
+            </Box>
+            <IconButton onClick={handleCloseEditDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {saveLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Сохранение...</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Текущее ФИО
+                </Typography>
+                <Typography variant="body1" sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                  {editUserData.currentName}
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Новое ФИО *
+                </Typography>
+                <TextField
+                  value={editUserData.newName}
+                  onChange={(e) => setEditUserData(prev => ({
+                    ...prev,
+                    newName: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Введите новое ФИО"
+                  size="small"
+                  autoFocus
+                  error={!editUserData.newName.trim()}
+                  helperText={!editUserData.newName.trim() ? "ФИО не может быть пустым" : ""}
+                />
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Информация
+                </Typography>
+                <Typography variant="body2">
+                  После изменения ФИО пользователя, новая информация будет отображаться во всех разделах системы.
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog} disabled={saveLoading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveName}
+            variant="contained"
+            disabled={saveLoading || !editUserData.newName.trim() || editUserData.newName === editUserData.currentName}
+          >
+            {saveLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Сохранить'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ РЕДАКТИРОВАНИЯ РОЛЕЙ */}
+      <Dialog 
+        open={openRolesDialog} 
+        onClose={handleCloseRolesDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <SecurityIcon />
+              </Avatar>
+              <Typography variant="h6">
+                Изменение ролей пользователя
+              </Typography>
+            </Box>
+            <IconButton onClick={handleCloseRolesDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {rolesLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Сохранение...</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Выберите роли пользователя
+                </Typography>
+                <FormGroup>
+                  {AVAILABLE_ROLES.map((role) => (
+                    <FormControlLabel
+                      key={role.value}
+                      control={
+                        <Checkbox
+                          checked={editRolesData.newRoles.includes(role.value)}
+                          onChange={() => handleRoleChange(role.value)}
+                          disabled={rolesLoading}
+                        />
+                      }
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {role.icon}
+                          <Typography>{role.label}</Typography>
+                        </Box>
+                      }
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Информация
+                </Typography>
+                <Typography variant="body2">
+                  • Администратор: полный доступ ко всем функциям системы<br />
+                  • Преподаватель: может создавать дисциплины и тесты<br />
+                  • Студент: может проходить тесты и просматривать результаты
+                </Typography>
+              </Box>
+              
+              {editRolesData.newRoles.length === 0 && (
+                <Alert severity="warning">
+                  Пользователь без ролей не сможет выполнять никакие действия в системе.
+                </Alert>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseRolesDialog} disabled={rolesLoading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveRoles}
+            variant="contained"
+            disabled={rolesLoading || JSON.stringify(editRolesData.newRoles.sort()) === JSON.stringify(editRolesData.currentRoles.sort())}
+          >
+            {rolesLoading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Сохранить'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ БЛОКИРОВКИ/РАЗБЛОКИРОВКИ */}
+      <Dialog 
+        open={openBlockDialog} 
+        onClose={handleCloseBlockDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: blockUserData.newBlocked ? 'error.main' : 'success.main' }}>
+                {blockUserData.newBlocked ? <LockIcon /> : <LockOpenIcon />}
+              </Avatar>
+              <Typography variant="h6">
+                {blockUserData.newBlocked ? 'Блокировка пользователя' : 'Разблокировка пользователя'}
+              </Typography>
+            </Box>
+            <IconButton onClick={handleCloseBlockDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {blockLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Выполнение...</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о пользователе
+                </Typography>
+                <Typography variant="body1">
+                  <strong>Пользователь:</strong> {blockUserData.name}
+                </Typography>
+                <Typography variant="body1" sx={{ mt: 1 }}>
+                  <strong>ID:</strong> {blockUserData.id}
+                </Typography>
+                <Typography variant="body1" sx={{ mt: 1 }}>
+                  <strong>Текущий статус:</strong> {blockUserData.currentBlocked ? 'Заблокирован' : 'Активен'}
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  {blockUserData.newBlocked ? 'Причина блокировки' : 'Причина разблокировки'}
+                </Typography>
+                <TextField
+                  value={blockUserData.reason}
+                  onChange={(e) => setBlockUserData(prev => ({
+                    ...prev,
+                    reason: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder={blockUserData.newBlocked ? "Укажите причину блокировки..." : "Укажите причину разблокировки..."}
+                  size="small"
+                  multiline
+                  rows={3}
+                />
+              </Box>
+              
+              {blockUserData.newBlocked ? (
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <WarningIcon /> Внимание!
+                  </Typography>
+                  <Typography variant="body2">
+                    • Заблокированный пользователь не сможет войти в систему<br />
+                    • Все его текущие сессии будут завершены<br />
+                    • Пользователь может быть разблокирован в любой момент
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'success.main', color: 'white', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <InfoIcon /> Информация
+                  </Typography>
+                  <Typography variant="body2">
+                    После разблокировки пользователь сможет войти в систему со своим текущим паролем.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseBlockDialog} disabled={blockLoading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleConfirmBlock}
+            variant="contained"
+            color={blockUserData.newBlocked ? "error" : "success"}
+            disabled={blockLoading || (blockUserData.newBlocked && !blockUserData.reason.trim())}
+          >
+            {blockLoading ? (
+              <CircularProgress size={20} />
+            ) : blockUserData.newBlocked ? (
+              'Заблокировать'
+            ) : (
+              'Разблокировать'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* УВЕДОМЛЕНИЯ */}
       <Snackbar
         open={snackbar.open}
