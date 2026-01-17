@@ -1,6 +1,5 @@
 #include "../include/oauth_github.hpp"
 #include "../include/utils.hpp"
-#include "../include/jwt_utils.hpp"
 #include <iostream>
 #include <sstream>
 
@@ -186,29 +185,44 @@ void handle_github_callback(
                 }
             }
             
-            auto user = mongodb_utils::find_or_create_user(email, "github", "Аноним");
-            auto permissions = jwt_utils::generate_permissions_from_roles(user.roles);
+            // mongodb
+            
+            bool user_exists = false;
+            
+            if (user_exists) {
+                std::vector<std::string> roles = {"Student"};
+                std::cout << "User found in database, roles: ";
+                for (const auto& role : roles) {
+                    std::cout << role << " ";
+                }
+                std::cout << std::endl;
+            } else {
+                std::cout << "Creating new user account for email: " << email << std::endl;
+                std::string username = "Аноним" + std::to_string(rand() % 10000);
+                std::vector<std::string> roles = {"Student"};
+                std::cout << "Created user: " << username << " with role: Student" << std::endl;
+            }
+            
+            std::vector<std::string> permissions = {"read:profile", "write:profile"};
+            
+            // jwt токены
 
-            std::string jwt_access_token = jwt_utils::generate_access_token(
-                email, 
-                permissions,
-                std::chrono::seconds(config["jwt"]["access_token_expiry"].get<int>())
-            );
-
-            std::string jwt_refresh_token = jwt_utils::generate_refresh_token(
-                email,
-                std::chrono::seconds(config["jwt"]["refresh_token_expiry"].get<int>())
-            );
-
-            mongodb_utils::save_refresh_token(user.id, jwt_refresh_token);
-
+            std::string jwt_access_token = "github_access_" + generate_state_token() + "_" + 
+                std::to_string(std::time(nullptr) + 60);
+            std::cout << "Generated JWT access token (placeholder)" << std::endl;
+            
+            std::string jwt_refresh_token = "github_refresh_" + generate_state_token() + "_" +
+                std::to_string(std::time(nullptr) + 7*24*60*60);
+            std::cout << "Generated JWT refresh token (placeholder)" << std::endl;
+            
+            std::cout << "Refresh token saved to database (placeholder)" << std::endl;
+            
             session.status = AuthStatus::GRANTED;
             session.access_token = jwt_access_token;
             session.refresh_token = jwt_refresh_token;
-            session.user_id = user.id;
-
-            std::cout << "Session updated successfully for user: " << user.username 
-                << " (ID: " << user.id << ")" << std::endl;
+            session.user_id = "github_user_" + email.substr(0, email.find('@'));
+            
+            std::cout << "Session updated successfully for user: " << *session.user_id << std::endl;
         }
     );
     

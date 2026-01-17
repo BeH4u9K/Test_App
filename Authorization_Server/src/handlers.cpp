@@ -22,25 +22,26 @@ void register_handlers(
     // эндпоинт /auth - начало авторизации
     server.Get("/auth", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-    
+        
         std::string provider = req.get_param_value("provider");
         std::string login_token = req.get_param_value("login_token");
-    
+        
         std::cout << "GET /auth - provider: " << provider << ", login_token: " << login_token << std::endl;
-    
+        
         if (provider.empty() || login_token.empty()) {
             res.status = 400;
             json error_response = {
                 {"error", "Missing parameters"},
                 {"required", {"provider", "login_token"}}
             };
+
             res.set_content(error_response.dump(), "application/json");
             return;
         }
-    
+        
         std::string oauth_state = generate_state_token();
         auto now = std::chrono::system_clock::now();
-    
+        
         AuthSession session{
             login_token,
             oauth_state,
@@ -48,14 +49,14 @@ void register_handlers(
             now,
             now + std::chrono::minutes(5),
             AuthStatus::PENDING,
-            std::nullopt,
-            std::nullopt,
-            std::nullopt
+            std::nullopt, // access_token
+            std::nullopt, // refresh_token
+            std::nullopt // user_id
         };
     
         session_storage.add_session(session);
         std::cout << "Created session - login_token: " << login_token << ", oauth_state: " << oauth_state << std::endl;
-    
+        
         json response;
         response["oauth_state"] = oauth_state;
         response["expires_at"] = std::chrono::duration_cast<std::chrono::seconds>(session.expires_at.time_since_epoch()).count();
@@ -63,75 +64,66 @@ void register_handlers(
         if (provider == "github") {
             std::string redirect_uri;
             std::string client_id;
-        
-            if (config.contains("github") && config["github"].is_object() && 
-                config["github"].contains("client_id") && config["github"]["client_id"].is_string() && 
-                !config["github"]["client_id"].get<std::string>().empty() &&
+    
+            if (config.contains("github") && config["github"].is_object() && config["github"].contains("client_id") && 
+                config["github"]["client_id"].is_string() && !config["github"]["client_id"].get<std::string>().empty() &&
                 config["github"].contains("redirect_uri") && config["github"]["redirect_uri"].is_string() &&
                 !config["github"]["redirect_uri"].get<std::string>().empty()) {
-            
-                client_id = config["github"]["client_id"].get<std::string>();
-                redirect_uri = config["github"]["redirect_uri"].get<std::string>();
+                    client_id = config["github"]["client_id"].get<std::string>();
+                    redirect_uri = config["github"]["redirect_uri"].get<std::string>();
             } else {
                 res.status = 500;
                 json error_response = {
                     {"error", "GitHub OAuth not configured properly"},
                     {"message", "Check your config/config.json file"}
                 };
+        
                 res.set_content(error_response.dump(), "application/json");
                 return;
             }
-        
-            std::string url = "https://github.com/login/oauth/authorize?client_id=" + 
-                client_id + "&redirect_uri=" + redirect_uri + 
-                "&response_type=code&state=" + oauth_state + "&scope=user:email";
+            std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id + "&redirect_uri=" + 
+                redirect_uri + "&response_type=code" + "&state=" + oauth_state + "&scope=user:email";
         
             std::cout << "GitHub auth URL: " << url << std::endl;
-        
             response["auth_url"] = url;
-            response["redirect_required"] = true;
-        
+
         } else if (provider == "yandex") {
             std::string redirect_uri;
             std::string client_id;
-        
-            if (config.contains("yandex") && config["yandex"].is_object() && 
-                config["yandex"].contains("client_id") && config["yandex"]["client_id"].is_string() && 
-                !config["yandex"]["client_id"].get<std::string>().empty() &&
+            
+            if (config.contains("yandex") && config["yandex"].is_object() && config["yandex"].contains("client_id") && 
+                config["yandex"]["client_id"].is_string() && !config["yandex"]["client_id"].get<std::string>().empty() &&
                 config["yandex"].contains("redirect_uri") && config["yandex"]["redirect_uri"].is_string() &&
                 !config["yandex"]["redirect_uri"].get<std::string>().empty()) {
-            
-                client_id = config["yandex"]["client_id"].get<std::string>();
-                redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
+                    client_id = config["yandex"]["client_id"].get<std::string>();
+                    redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
             } else {
                 res.status = 500;
                 json error_response = {
                     {"error", "Yandex OAuth not configured properly"},
                     {"message", "Check your config/config.json file"}
                 };
+                
                 res.set_content(error_response.dump(), "application/json");
                 return;
             }
-        
-            std::string url = "https://oauth.yandex.ru/authorize?response_type=code&client_id=" + 
+            
+            std::string url = "https://oauth.yandex.ru/authorize?response_type=code" + std::string("&client_id=") + 
                 client_id + "&redirect_uri=" + redirect_uri + "&state=" + oauth_state;
-        
+                
             std::cout << "Yandex auth URL: " << url << std::endl;
-        
             response["auth_url"] = url;
-            response["redirect_required"] = true;
-        
+            
         } else if (provider == "code") {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<> dis(100000, 999999);
             std::string code = std::to_string(dis(gen));
-        
+            
             response["auth_type"] = "code";
             response["code"] = code;
             response["message"] = "Enter this code in your authorized device";
-            response["redirect_required"] = false;
-        
+            
         } else {
             res.status = 400;
             json error_response = {
@@ -141,7 +133,7 @@ void register_handlers(
             res.set_content(error_response.dump(), "application/json");
             return;
         }
-    
+        
         res.set_content(response.dump(), "application/json");
     });
 
@@ -297,10 +289,5 @@ void register_handlers(
             res.status = 400;
             res.set_content("{\"error\":\"Invalid JSON format\"}", "application/json");
         }
-    });
-
-    server.Get("/health", [&](const Request& req, Response& res) {
-        set_cors_headers(res);
-        res.set_content("{\"status\":\"ok\"}", "application/json");
     });
 }
