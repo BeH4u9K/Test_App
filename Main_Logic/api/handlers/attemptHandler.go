@@ -89,11 +89,21 @@ func CompleteAttemptHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	score, err := core.GetScore(attemptID)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+
 	// Успешный ответ
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Attempt completed successfully",
+		"score":   score,
 	})
 }
 
