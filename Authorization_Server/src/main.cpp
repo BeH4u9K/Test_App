@@ -15,12 +15,12 @@ int main() {
     if (!load_config(config)) {
         config = {
             {"server", {{"port", 8080}, {"host", "0.0.0.0"}}},
-            {"jwt", {{"secret", "default-jwt-secret-key-for-testing-1234567890"}}}
+            {"jwt", {{"secret", "e2A0B1C2D3E4F5a6b7c8d9e0f1g2h"}}}
         };
     }
 
-    std::string host = config["server"]["host"];
     int port = config["server"]["port"];
+    std::string host = config["server"]["host"];
     
     std::string jwt_secret = "e2A0B1C2D3E4F5a6b7c8d9e0f1g2h";
     if (config.contains("jwt") && config["jwt"].contains("secret")) {
@@ -30,11 +30,11 @@ int main() {
     SessionStorage session_storage;
     auto mongo_db = std::make_shared<MongoDB>("mongodb://localhost:27017", "auth_db");
     auto jwt_handler = std::make_shared<JWTHandler>(jwt_secret);
-
+    
     Server server;
     register_handlers(server, session_storage, config, mongo_db, jwt_handler);
-
-    std::cout << "Authorization Server started on " << host << ":" << port << "\n";
+    
+    std::cout << "Authorization Server started on " << host << ":" << port << std::endl;
     server.listen(host.c_str(), port);
     return 0;
 }
