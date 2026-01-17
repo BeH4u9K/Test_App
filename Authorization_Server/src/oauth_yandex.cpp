@@ -1,9 +1,9 @@
 #include "../include/oauth_yandex.hpp"
 #include "../include/utils.hpp"
-#include "../include/jwt_utils.hpp"
-#include "../include/mongodb_utils.hpp"
+#include "../include/mongodb.hpp"
+#include "../include/jwt_token.hpp"
 #include <iostream>
-#include <sstream>
+#include <random>
 
 using json = nlohmann::json;
 using namespace httplib;
@@ -12,22 +12,19 @@ void handle_yandex_callback(
     const Request& req,
     Response& res,
     SessionStorage& storage,
-    const json& config
+    const json& config,
+    std::shared_ptr<MongoDB> mongo_db,
+    std::shared_ptr<JWTHandler> jwt_handler
 ) {
     std::string code = req.get_param_value("code");
     std::string oauth_state = req.get_param_value("state");
     std::string error = req.get_param_value("error");
-    std::string error_description = req.get_param_value("error_description");
     
     std::cout << "=== YANDEX CALLBACK START ===" << std::endl;
-    std::cout << "GET /callback/yandex - code: " << code << ", oauth_state: " << oauth_state << ", error: " << error << std::endl;
+    std::cout << "GET /callback/yandex - code: " << code << ", oauth_state: " << oauth_state  << ", error: " << error << std::endl;
 
     if (!error.empty()) {
-        std::cout << "Yandex returned error: " << error;
-        if (!error_description.empty()) {
-            std::cout << " - " << error_description;
-        }
-        std::cout << std::endl;
+        std::cout << "Yandex returned error: " << error << std::endl;
         
         storage.update_session_status_by_oauth_state(oauth_state, AuthStatus::DENIED);
         
@@ -45,56 +42,36 @@ void handle_yandex_callback(
         [&](AuthSession& session) {
             std::cout << "Processing session for login_token: " << session.login_token << std::endl;
             
-            if (!config.contains("yandex") || !config["yandex"].contains("client_id") || 
-                !config["yandex"].contains("client_secret") || !config["yandex"].contains("redirect_uri")) {
+            if (!config.contains("yandex") || !config["yandex"].contains("client_id") || !config["yandex"].contains("client_secret")) {
                 throw std::runtime_error("Yandex config missing or incomplete");
             }
             
             std::string client_id = config["yandex"]["client_id"].get<std::string>();
             std::string client_secret = config["yandex"]["client_secret"].get<std::string>();
-            std::string redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
             
-            if (client_id.empty() || client_secret.empty() || redirect_uri.empty()) {
-                throw std::runtime_error("Yandex client_id, client_secret or redirect_uri is empty");
+            if (client_id.empty() || client_secret.empty()) {
+                throw std::runtime_error("Yandex client_id or client_secret is empty");
             }
             
-            std::string post_body = "grant_type=authorization_code&code=" + code +
+            std::string post_body = "grant_type=authorization_code" + std::string("&code=") + code +
                 "&client_id=" + client_id + "&client_secret=" + client_secret;
             
             std::cout << "Requesting token from Yandex..." << std::endl;
-
-            httplib::Client token_cli("https://oauth.yandex.ru");
-            token_cli.enable_server_certificate_verification(false);
-            token_cli.set_connection_timeout(30);
-            token_cli.set_read_timeout(30);
-
-            httplib::Headers headers = {
-                {"Content-Type", "application/x-www-form-urlencoded"},
-                {"Accept", "application/json"}
-            };
-
-            auto token_res = token_cli.Post("/token", headers, post_body, "application/x-www-form-urlencoded");
-
-            if (!token_res) {
-                std::cerr << "ERROR: Connection to Yandex failed" << std::endl;
-                throw std::runtime_error("Failed to connect to Yandex OAuth");
+            auto token_response = http_post("https://oauth.yandex.ru", "/token", post_body);
+            
+            if (!token_response) {
+                throw std::runtime_error("Failed to exchange code for Yandex token");
             }
-
-            if (token_res->status != 200) {
-                std::cerr << "ERROR: Yandex returned status " << token_res->status << std::endl;
-                std::cerr << "Response: " << token_res->body << std::endl;
-                throw std::runtime_error("Yandex API error: " + std::to_string(token_res->status));
-            }
-
+            
+            std::cout << "Token response received" << std::endl;
+            
             json token_data;
             try {
-                token_data = json::parse(token_res->body);
+                token_data = json::parse(*token_response);
             } catch (const json::exception& e) {
-                std::cerr << "ERROR: Failed to parse JSON from Yandex: " << e.what() << std::endl;
-                std::cerr << "Raw response: " << token_res->body << std::endl;
-                throw std::runtime_error("Failed to parse Yandex response: " + std::string(e.what()));
+                throw std::runtime_error("Failed to parse token response: " + std::string(e.what()));
             }
-
+            
             if (!token_data.contains("access_token") || token_data["access_token"].is_null()) {
                 std::cerr << "ERROR: No access_token in response" << std::endl;
                 std::cerr << "Full response: " << token_data.dump() << std::endl;
@@ -106,17 +83,16 @@ void handle_yandex_callback(
                       << yandex_access_token.substr(0, std::min(20, (int)yandex_access_token.length())) 
                       << "..." << std::endl;
 
-            httplib::Client user_cli("https://login.yandex.ru");
-            user_cli.set_connection_timeout(5);
-            user_cli.set_read_timeout(5);
+            httplib::Client cli("https://login.yandex.ru");
+            cli.set_connection_timeout(5);
+            cli.set_read_timeout(5);
             
-            httplib::Headers user_headers = {
-                {"Authorization", "OAuth " + yandex_access_token},
-                {"Accept", "application/json"}
+            httplib::Headers headers = {
+                {"Authorization", "OAuth " + yandex_access_token}
             };
             
             std::cout << "Requesting user info from Yandex..." << std::endl;
-            auto user_res = user_cli.Get("/info?format=json", user_headers);
+            auto user_res = cli.Get("/info?format=json", headers);
             
             if (!user_res) {
                 throw std::runtime_error("Failed to connect to login.yandex.ru");
@@ -125,8 +101,7 @@ void handle_yandex_callback(
             std::cout << "User info status: " << user_res->status << std::endl;
             
             if (user_res->status != 200) {
-                throw std::runtime_error("Failed to get user data from Yandex. Status: " + 
-                    std::to_string(user_res->status) + "\nResponse: " + user_res->body);
+                throw std::runtime_error("Failed to get user data from Yandex. Status: " + std::to_string(user_res->status));
             }
             
             json user_data;
@@ -136,65 +111,85 @@ void handle_yandex_callback(
                 throw std::runtime_error("Failed to parse user data: " + std::string(e.what()));
             }
             
-            std::string email;
-            std::string username;
-            
-            if (user_data.contains("default_email") && !user_data["default_email"].is_null()) {
-                email = user_data["default_email"].get<std::string>();
-                std::cout << "Yandex user email: " << email << std::endl;
-            } else {
+            if (!user_data.contains("default_email") || user_data["default_email"].is_null()) {
                 std::cerr << "ERROR: No default_email in user data" << std::endl;
                 std::cerr << "Full user data: " << user_data.dump() << std::endl;
                 throw std::runtime_error("Не удалось получить email пользователя от Яндекс");
             }
             
-            if (user_data.contains("real_name") && !user_data["real_name"].is_null()) {
-                username = user_data["real_name"].get<std::string>();
-                std::cout << "Yandex user real name: " << username << std::endl;
-            } else if (user_data.contains("display_name") && !user_data["display_name"].is_null()) {
-                username = user_data["display_name"].get<std::string>();
-                std::cout << "Yandex user display name: " << username << std::endl;
-            } else if (user_data.contains("first_name") && !user_data["first_name"].is_null() &&
-                       user_data.contains("last_name") && !user_data["last_name"].is_null()) {
-                username = user_data["first_name"].get<std::string>() + " " + 
-                          user_data["last_name"].get<std::string>();
-                std::cout << "Yandex user full name: " << username << std::endl;
-            } else if (user_data.contains("login") && !user_data["login"].is_null()) {
-                username = user_data["login"].get<std::string>();
-                std::cout << "Yandex user login: " << username << std::endl;
+            std::string email = user_data["default_email"].get<std::string>();
+            std::cout << "Yandex user email: " << email << std::endl;
+
+            bool user_exists = false;
+            std::vector<std::string> user_roles;
+            
+            if (mongo_db) {
+                auto user_opt = mongo_db->find_user_by_email(email);
+                if (user_opt) {
+                    user_exists = true;
+                    user_roles = user_opt->roles;
+                    
+                    std::cout << "User found in database, roles: ";
+                    for (const auto& role : user_roles) {
+                        std::cout << role << " ";
+                    }
+                    std::cout << std::endl;
+                } else {
+                    std::cout << "Creating new user account for email: " << email << std::endl;
+                    
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    std::uniform_int_distribution<> dis(1000, 9999);
+                    std::string username = "Аноним" + std::to_string(dis(gen));
+                    
+                    user_roles = {"Student"};
+                    
+                    if (mongo_db->create_user(email, username, user_roles)) {
+                        std::cout << "Created user: " << username << " with role: Student" << std::endl;
+                        user_exists = true;
+                    } else {
+                        std::cerr << "ERROR: Failed to create user in database" << std::endl;
+                    }
+                }
             } else {
-                username = "ЯндексПользователь";
-                std::cout << "Using default username: " << username << std::endl;
+                std::cout << "WARNING: MongoDB not available, using default roles" << std::endl;
+                user_roles = {"Student"};
+                user_exists = true;
             }
-
-            auto user = mongodb_utils::find_or_create_user(email, "yandex", username);
-            auto permissions = jwt_utils::generate_permissions_from_roles(user.roles);
-
-            if (!config.contains("jwt") || !config["jwt"].contains("access_token_expiry") || 
-                !config["jwt"].contains("refresh_token_expiry")) {
-                throw std::runtime_error("JWT config missing or incomplete");
+            
+            std::vector<std::string> permissions = JWTHandler::get_permissions_for_roles(user_roles);
+            
+            std::cout << "User permissions: ";
+            for (const auto& perm : permissions) {
+                std::cout << perm << " ";
             }
+            std::cout << std::endl;
 
-            std::string jwt_access_token = jwt_utils::generate_access_token(
-                email, 
-                permissions,
-                std::chrono::seconds(config["jwt"]["access_token_expiry"].get<int>())
+            std::string user_id = "yandex_user_" + email.substr(0, email.find('@'));
+    
+            std::string jwt_access_token = jwt_handler->generate_access_token(
+                user_id, email, user_roles, permissions
             );
 
-            std::string jwt_refresh_token = jwt_utils::generate_refresh_token(
-                email,
-                std::chrono::seconds(config["jwt"]["refresh_token_expiry"].get<int>())
-            );
+            std::string jwt_refresh_token = jwt_handler->generate_refresh_token(user_id, email);
+            
+            std::cout << "Generated JWT access token: " << jwt_access_token.substr(0, 50) << "..." << std::endl;
+            std::cout << "Generated JWT refresh token: " << jwt_refresh_token.substr(0, 50) << "..." << std::endl;
 
-            mongodb_utils::save_refresh_token(user.id, jwt_refresh_token);
+            if (mongo_db && user_exists) {
+                if (mongo_db->add_refresh_token(email, jwt_refresh_token)) {
+                    std::cout << "Refresh token saved to database" << std::endl;
+                } else {
+                    std::cerr << "ERROR: Failed to save refresh token to database" << std::endl;
+                }
+            }
 
             session.status = AuthStatus::GRANTED;
             session.access_token = jwt_access_token;
             session.refresh_token = jwt_refresh_token;
-            session.user_id = user.id;
-
-            std::cout << "Session updated successfully for user: " << user.username 
-                      << " (ID: " << user.id << ", Email: " << email << ")" << std::endl;
+            session.user_id = user_id;
+            
+            std::cout << "Session updated successfully" << std::endl;
         }
     );
     

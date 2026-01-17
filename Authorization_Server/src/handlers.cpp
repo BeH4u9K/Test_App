@@ -2,6 +2,7 @@
 #include "../include/utils.hpp"
 #include "../include/oauth_github.hpp"
 #include "../include/oauth_yandex.hpp"
+#include "../include/mongodb.hpp"
 #include <iostream>
 #include <random>
 
@@ -11,7 +12,9 @@ using namespace httplib;
 void register_handlers(
     Server& server,
     SessionStorage& session_storage,
-    const json& config
+    const json& config,
+    std::shared_ptr<MongoDB> mongo_db,
+    std::shared_ptr<JWTHandler> jwt_handler
 ) {
     // обработчик для OPTIONS запросов (preflight CORS)
     server.Options(R"(.*)", [&](const Request& req, Response& res) {
@@ -22,25 +25,26 @@ void register_handlers(
     // эндпоинт /auth - начало авторизации
     server.Get("/auth", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-    
+        
         std::string provider = req.get_param_value("provider");
         std::string login_token = req.get_param_value("login_token");
-    
+        
         std::cout << "GET /auth - provider: " << provider << ", login_token: " << login_token << std::endl;
-    
+        
         if (provider.empty() || login_token.empty()) {
             res.status = 400;
             json error_response = {
                 {"error", "Missing parameters"},
                 {"required", {"provider", "login_token"}}
             };
+
             res.set_content(error_response.dump(), "application/json");
             return;
         }
-    
+        
         std::string oauth_state = generate_state_token();
         auto now = std::chrono::system_clock::now();
-    
+        
         AuthSession session{
             login_token,
             oauth_state,
@@ -48,14 +52,14 @@ void register_handlers(
             now,
             now + std::chrono::minutes(5),
             AuthStatus::PENDING,
-            std::nullopt,
-            std::nullopt,
-            std::nullopt
+            std::nullopt, // access_token
+            std::nullopt, // refresh_token
+            std::nullopt // user_id
         };
     
         session_storage.add_session(session);
         std::cout << "Created session - login_token: " << login_token << ", oauth_state: " << oauth_state << std::endl;
-    
+        
         json response;
         response["oauth_state"] = oauth_state;
         response["expires_at"] = std::chrono::duration_cast<std::chrono::seconds>(session.expires_at.time_since_epoch()).count();
@@ -63,75 +67,68 @@ void register_handlers(
         if (provider == "github") {
             std::string redirect_uri;
             std::string client_id;
-        
-            if (config.contains("github") && config["github"].is_object() && 
-                config["github"].contains("client_id") && config["github"]["client_id"].is_string() && 
-                !config["github"]["client_id"].get<std::string>().empty() &&
+    
+            if (config.contains("github") && config["github"].is_object() && config["github"].contains("client_id") && 
+                config["github"]["client_id"].is_string() && !config["github"]["client_id"].get<std::string>().empty() &&
                 config["github"].contains("redirect_uri") && config["github"]["redirect_uri"].is_string() &&
                 !config["github"]["redirect_uri"].get<std::string>().empty()) {
-            
-                client_id = config["github"]["client_id"].get<std::string>();
-                redirect_uri = config["github"]["redirect_uri"].get<std::string>();
+                    client_id = config["github"]["client_id"].get<std::string>();
+                    redirect_uri = config["github"]["redirect_uri"].get<std::string>();
             } else {
                 res.status = 500;
                 json error_response = {
                     {"error", "GitHub OAuth not configured properly"},
                     {"message", "Check your config/config.json file"}
                 };
+        
                 res.set_content(error_response.dump(), "application/json");
                 return;
             }
-        
-            std::string url = "https://github.com/login/oauth/authorize?client_id=" + 
-                client_id + "&redirect_uri=" + redirect_uri + 
-                "&response_type=code&state=" + oauth_state + "&scope=user:email";
+            std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id + "&redirect_uri=" + 
+                redirect_uri + "&response_type=code" + "&state=" + oauth_state + "&scope=user:email";
         
             std::cout << "GitHub auth URL: " << url << std::endl;
-        
             response["auth_url"] = url;
             response["redirect_required"] = true;
-        
+
         } else if (provider == "yandex") {
             std::string redirect_uri;
             std::string client_id;
-        
-            if (config.contains("yandex") && config["yandex"].is_object() && 
-                config["yandex"].contains("client_id") && config["yandex"]["client_id"].is_string() && 
-                !config["yandex"]["client_id"].get<std::string>().empty() &&
+            
+            if (config.contains("yandex") && config["yandex"].is_object() && config["yandex"].contains("client_id") && 
+                config["yandex"]["client_id"].is_string() && !config["yandex"]["client_id"].get<std::string>().empty() &&
                 config["yandex"].contains("redirect_uri") && config["yandex"]["redirect_uri"].is_string() &&
                 !config["yandex"]["redirect_uri"].get<std::string>().empty()) {
-            
-                client_id = config["yandex"]["client_id"].get<std::string>();
-                redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
+                    client_id = config["yandex"]["client_id"].get<std::string>();
+                    redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
             } else {
                 res.status = 500;
                 json error_response = {
                     {"error", "Yandex OAuth not configured properly"},
                     {"message", "Check your config/config.json file"}
                 };
+                
                 res.set_content(error_response.dump(), "application/json");
                 return;
             }
-        
-            std::string url = "https://oauth.yandex.ru/authorize?response_type=code&client_id=" + 
+            
+            std::string url = "https://oauth.yandex.ru/authorize?response_type=code" + std::string("&client_id=") + 
                 client_id + "&redirect_uri=" + redirect_uri + "&state=" + oauth_state;
-        
+                
             std::cout << "Yandex auth URL: " << url << std::endl;
-        
             response["auth_url"] = url;
             response["redirect_required"] = true;
-        
+            
         } else if (provider == "code") {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_int_distribution<> dis(100000, 999999);
             std::string code = std::to_string(dis(gen));
-        
+            
             response["auth_type"] = "code";
             response["code"] = code;
             response["message"] = "Enter this code in your authorized device";
-            response["redirect_required"] = false;
-        
+            
         } else {
             res.status = 400;
             json error_response = {
@@ -141,7 +138,7 @@ void register_handlers(
             res.set_content(error_response.dump(), "application/json");
             return;
         }
-    
+        
         res.set_content(response.dump(), "application/json");
     });
 
@@ -216,91 +213,126 @@ void register_handlers(
     // callback от github
     server.Get("/callback/github", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        handle_github_callback(req, res, session_storage, config);
+        handle_github_callback(req, res, session_storage, config, mongo_db, jwt_handler);
     });
 
     // callback от yandex
     server.Get("/callback/yandex", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        handle_yandex_callback(req, res, session_storage, config);
+        handle_yandex_callback(req, res, session_storage, config, mongo_db, jwt_handler);
     });
 
     // обновление токенов
     server.Post("/refresh", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        
+    
+        json body;
         try {
-            json body = json::parse(req.body);
-            std::string refresh_token = body.value("refresh_token", "");
-            
-            if (refresh_token.empty()) {
-                res.status = 400;
-                res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
-                return;
-            }
-            
-            std::cout << "POST /refresh - refresh_token: " << refresh_token << std::endl;
-
-            if (refresh_token.find("_refresh_") == std::string::npos) {
-                res.status = 401;
-                res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
-                return;
-            }
-
-            std::string user_id = "user_example";
-
-            std::string new_access_token = "new_access_" + generate_state_token();
-            std::string new_refresh_token = "new_refresh_" + generate_state_token();
-            
-            json response = {
-                {"access_token", new_access_token},
-                {"refresh_token", new_refresh_token}
-            };
-            
-            res.set_content(response.dump(), "application/json");
-            
+            body = json::parse(req.body);
         } catch (const json::exception& e) {
             res.status = 400;
-            res.set_content("{\"error\":\"Invalid JSON format\"}", "application/json");
+            res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+            return;
         }
+        
+        std::string refresh_token = body.value("refresh_token", "");
+    
+        if (refresh_token.empty()) {
+            res.status = 400;
+            res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
+            return;
+        }
+    
+        std::cout << "POST /refresh - refresh_token: " << refresh_token.substr(0, 20) << "..." << std::endl;
+
+        if (!jwt_handler->validate_token(refresh_token)) {
+            res.status = 401;
+            res.set_content("{\"error\":\"Invalid or expired refresh token\"}", "application/json");
+            return;
+        }
+
+        if (!jwt_handler->is_refresh_token(refresh_token)) {
+            res.status = 401;
+            res.set_content("{\"error\":\"Not a refresh token\"}", "application/json");
+            return;
+        }
+
+        auto email_opt = jwt_handler->get_email(refresh_token);
+        if (!email_opt) {
+            res.status = 401;
+            res.set_content("{\"error\":\"Cannot extract email from token\"}", "application/json");
+            return;
+        }
+
+        auto user_opt = mongo_db->find_user_by_email(*email_opt);
+        if (!user_opt) {
+            res.status = 404;
+            res.set_content("{\"error\":\"User not found\"}", "application/json");
+            return;
+        }
+    
+        User user = *user_opt;
+        auto user_id_opt = jwt_handler->get_user_id(refresh_token);
+        std::string user_id = user_id_opt ? *user_id_opt : "user_" + *email_opt;
+
+        std::vector<std::string> permissions = JWTHandler::get_permissions_for_roles(user.roles);
+    
+        std::string new_access_token = jwt_handler->generate_access_token(
+            user_id, *email_opt, user.roles, permissions
+        );
+    
+        std::string new_refresh_token = jwt_handler->generate_refresh_token(user_id, *email_opt);
+
+        json response = {
+            {"access_token", new_access_token},
+            {"refresh_token", new_refresh_token}
+        };
+    
+        res.set_content(response.dump(), "application/json");
     });
     
     // выход из системы
     server.Post("/logout", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        
+    
+        json body;
         try {
-            json body = json::parse(req.body);
-            std::string refresh_token = body.value("refresh_token", "");
-            
-            if (refresh_token.empty()) {
-                res.status = 400;
-                res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
-                return;
-            }
-            
-            std::cout << "POST /logout - refresh_token: " << refresh_token << std::endl;
-            
-            if (refresh_token.find("_refresh_") == std::string::npos) {
-                res.status = 401;
-                res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
-                return;
-            }
-            
-            json response = {
-                {"message", "Logged out successfully"}
-            };
-            
-            res.set_content(response.dump(), "application/json");
-            
+            body = json::parse(req.body);
         } catch (const json::exception& e) {
             res.status = 400;
-            res.set_content("{\"error\":\"Invalid JSON format\"}", "application/json");
+            res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+            return;
         }
-    });
+        
+        std::string refresh_token = body.value("refresh_token", "");
+        bool all_devices = body.value("all_devices", false);
+    
+        if (refresh_token.empty()) {
+            res.status = 400;
+            res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
+            return;
+        }
+    
+        std::cout << "POST /logout - refresh_token: " << refresh_token.substr(0, 20) << "..." 
+            << ", all_devices: " << (all_devices ? "true" : "false") << std::endl;
 
-    server.Get("/health", [&](const Request& req, Response& res) {
-        set_cors_headers(res);
-        res.set_content("{\"status\":\"ok\"}", "application/json");
+        auto email_opt = jwt_handler->get_email(refresh_token);
+        if (!email_opt) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
+            return;
+        }
+    
+        if (mongo_db->remove_refresh_token(*email_opt, refresh_token)) {
+            std::cout << "Refresh token removed from database" << std::endl;
+        } else {
+            std::cout << "WARNING: Could not remove refresh token from database" << std::endl;
+        }
+        
+        json response = {
+            {"message", "Logged out successfully"}
+        };
+    
+        res.set_content(response.dump(), "application/json");
     });
 }
