@@ -87,9 +87,9 @@ func CreateQuestionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Title   string              `json:"title"`
-		Text    string              `json:"text"`
-		Answers []core.AnswerOption `json:"answers"`
+		Title   string                   `json:"title"`
+		Text    string                   `json:"text"`
+		Answers []core.AnswerOptionInput `json:"answers"`
 	}
 
 	decoder := json.NewDecoder(r.Body)

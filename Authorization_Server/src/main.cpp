@@ -1,10 +1,11 @@
 #include <iostream>
+#include <memory>
 #include "../libs/httplib.h"
 #include "../include/session_storage.hpp"
 #include "../include/config_loader.hpp"
 #include "../include/handlers.hpp"
-#include "../include/jwt_utils.hpp"
-#include "../include/mongodb_utils.hpp"
+#include "../include/mongodb.hpp"
+#include "../include/jwt_token.hpp"
 
 using json = nlohmann::json;
 using namespace httplib;
@@ -12,35 +13,28 @@ using namespace httplib;
 int main() {
     json config;
     if (!load_config(config)) {
-        config = {{"server", {{"port", 8080}, {"host", "0.0.0.0"}}}};
+        config = {
+            {"server", {{"port", 8080}, {"host", "0.0.0.0"}}},
+            {"jwt", {{"secret", "e2A0B1C2D3E4F5a6b7c8d9e0f1g2h"}}}
+        };
     }
 
-    std::string host = config["server"]["host"];
     int port = config["server"]["port"];
-
-    try {
-        jwt_utils::init_jwt(config);
-        std::cout << "JWT initialized successfully" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to initialize JWT: " << e.what() << std::endl;
-        return 1;
+    std::string host = config["server"]["host"];
+    
+    std::string jwt_secret = "e2A0B1C2D3E4F5a6b7c8d9e0f1g2h";
+    if (config.contains("jwt") && config["jwt"].contains("secret")) {
+        jwt_secret = config["jwt"]["secret"].get<std::string>();
     }
-
-    try {
-        mongodb_utils::init_mongodb(config);
-        std::cout << "MongoDB initialized successfully" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to initialize MongoDB: " << e.what() << std::endl;
-        std::cerr << "Running without database support" << std::endl;
-    }
-
+    
     SessionStorage session_storage;
+    auto mongo_db = std::make_shared<MongoDB>("mongodb://localhost:27017", "auth_db");
+    auto jwt_handler = std::make_shared<JWTHandler>(jwt_secret);
+    
     Server server;
-
-    register_handlers(server, session_storage, config);
-
-    std::cout << "\nAuthorization Server listening on " << host << ":" << port << "\n";
-
+    register_handlers(server, session_storage, config, mongo_db, jwt_handler);
+    
+    std::cout << "Authorization Server started on " << host << ":" << port << std::endl;
     server.listen(host.c_str(), port);
     return 0;
 }

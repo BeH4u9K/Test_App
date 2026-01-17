@@ -44,7 +44,6 @@ func RegisterRoutes(r *mux.Router) {
 
 	// Questions
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.RemoveQuestionHandler).Methods("DELETE")
-	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.AddQuestionHandler).Methods("POST")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}/passers/attempts", handlers.CheckUserAnswersHandler).Methods("GET")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}/questions", handlers.GetQuestionsHandler).Methods("GET")
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}/questions/{questionID:[0-9]+}", handlers.GetQuestionHandler).Methods("GET")
