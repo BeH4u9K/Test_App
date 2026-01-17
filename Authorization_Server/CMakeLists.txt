@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_definitions(-DCPPHTTPLIB_OPENSSL_SUPPORT)
 
+include_directories(/usr/local/include)
+
 set(SOURCES
     src/main.cpp
     src/handlers.cpp
@@ -13,6 +15,7 @@ set(SOURCES
     src/oauth_github.cpp
     src/oauth_yandex.cpp
     src/utils.cpp
+    src/mongodb.cpp
 )
 
 add_executable(authorization_server ${SOURCES})
@@ -20,6 +23,7 @@ add_executable(authorization_server ${SOURCES})
 target_include_directories(authorization_server PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/libs
+    /usr/local/include
 )
 
 find_package(OpenSSL REQUIRED)

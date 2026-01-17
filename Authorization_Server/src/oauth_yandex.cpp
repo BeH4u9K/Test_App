@@ -1,6 +1,9 @@
 #include "../include/oauth_yandex.hpp"
 #include "../include/utils.hpp"
+#include "../include/mongodb.hpp"
+#include "../include/jwt_token.hpp"
 #include <iostream>
+#include <random>
 
 using json = nlohmann::json;
 using namespace httplib;
@@ -9,7 +12,9 @@ void handle_yandex_callback(
     const Request& req,
     Response& res,
     SessionStorage& storage,
-    const json& config
+    const json& config,
+    std::shared_ptr<MongoDB> mongo_db,
+    std::shared_ptr<JWTHandler> jwt_handler
 ) {
     std::string code = req.get_param_value("code");
     std::string oauth_state = req.get_param_value("state");
@@ -114,14 +119,75 @@ void handle_yandex_callback(
             
             std::string email = user_data["default_email"].get<std::string>();
             std::cout << "Yandex user email: " << email << std::endl;
+
+            bool user_exists = false;
+            std::vector<std::string> user_roles;
             
-            std::string jwt_access_token = "yandex_access_" + generate_state_token();
-            std::string jwt_refresh_token = "yandex_refresh_" + generate_state_token();
+            if (mongo_db) {
+                auto user_opt = mongo_db->find_user_by_email(email);
+                if (user_opt) {
+                    user_exists = true;
+                    user_roles = user_opt->roles;
+                    
+                    std::cout << "User found in database, roles: ";
+                    for (const auto& role : user_roles) {
+                        std::cout << role << " ";
+                    }
+                    std::cout << std::endl;
+                } else {
+                    std::cout << "Creating new user account for email: " << email << std::endl;
+                    
+                    std::random_device rd;
+                    std::mt19937 gen(rd());
+                    std::uniform_int_distribution<> dis(1000, 9999);
+                    std::string username = "Аноним" + std::to_string(dis(gen));
+                    
+                    user_roles = {"Student"};
+                    
+                    if (mongo_db->create_user(email, username, user_roles)) {
+                        std::cout << "Created user: " << username << " with role: Student" << std::endl;
+                        user_exists = true;
+                    } else {
+                        std::cerr << "ERROR: Failed to create user in database" << std::endl;
+                    }
+                }
+            } else {
+                std::cout << "WARNING: MongoDB not available, using default roles" << std::endl;
+                user_roles = {"Student"};
+                user_exists = true;
+            }
             
+            std::vector<std::string> permissions = JWTHandler::get_permissions_for_roles(user_roles);
+            
+            std::cout << "User permissions: ";
+            for (const auto& perm : permissions) {
+                std::cout << perm << " ";
+            }
+            std::cout << std::endl;
+
+            std::string user_id = "yandex_user_" + email.substr(0, email.find('@'));
+    
+            std::string jwt_access_token = jwt_handler->generate_access_token(
+                user_id, email, user_roles, permissions
+            );
+
+            std::string jwt_refresh_token = jwt_handler->generate_refresh_token(user_id, email);
+            
+            std::cout << "Generated JWT access token: " << jwt_access_token.substr(0, 50) << "..." << std::endl;
+            std::cout << "Generated JWT refresh token: " << jwt_refresh_token.substr(0, 50) << "..." << std::endl;
+
+            if (mongo_db && user_exists) {
+                if (mongo_db->add_refresh_token(email, jwt_refresh_token)) {
+                    std::cout << "Refresh token saved to database" << std::endl;
+                } else {
+                    std::cerr << "ERROR: Failed to save refresh token to database" << std::endl;
+                }
+            }
+
             session.status = AuthStatus::GRANTED;
             session.access_token = jwt_access_token;
             session.refresh_token = jwt_refresh_token;
-            session.user_id = "yandex_user_" + email.substr(0, email.find('@'));
+            session.user_id = user_id;
             
             std::cout << "Session updated successfully" << std::endl;
         }

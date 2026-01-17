@@ -2,6 +2,7 @@
 #include "../include/utils.hpp"
 #include "../include/oauth_github.hpp"
 #include "../include/oauth_yandex.hpp"
+#include "../include/mongodb.hpp"
 #include <iostream>
 #include <random>
 
@@ -11,7 +12,9 @@ using namespace httplib;
 void register_handlers(
     Server& server,
     SessionStorage& session_storage,
-    const json& config
+    const json& config,
+    std::shared_ptr<MongoDB> mongo_db,
+    std::shared_ptr<JWTHandler> jwt_handler
 ) {
     // обработчик для OPTIONS запросов (preflight CORS)
     server.Options(R"(.*)", [&](const Request& req, Response& res) {
@@ -86,6 +89,7 @@ void register_handlers(
         
             std::cout << "GitHub auth URL: " << url << std::endl;
             response["auth_url"] = url;
+            response["redirect_required"] = true;
 
         } else if (provider == "yandex") {
             std::string redirect_uri;
@@ -113,6 +117,7 @@ void register_handlers(
                 
             std::cout << "Yandex auth URL: " << url << std::endl;
             response["auth_url"] = url;
+            response["redirect_required"] = true;
             
         } else if (provider == "code") {
             std::random_device rd;
@@ -208,86 +213,126 @@ void register_handlers(
     // callback от github
     server.Get("/callback/github", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        handle_github_callback(req, res, session_storage, config);
+        handle_github_callback(req, res, session_storage, config, mongo_db, jwt_handler);
     });
 
     // callback от yandex
     server.Get("/callback/yandex", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        handle_yandex_callback(req, res, session_storage, config);
+        handle_yandex_callback(req, res, session_storage, config, mongo_db, jwt_handler);
     });
 
     // обновление токенов
     server.Post("/refresh", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        
+    
+        json body;
         try {
-            json body = json::parse(req.body);
-            std::string refresh_token = body.value("refresh_token", "");
-            
-            if (refresh_token.empty()) {
-                res.status = 400;
-                res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
-                return;
-            }
-            
-            std::cout << "POST /refresh - refresh_token: " << refresh_token << std::endl;
-
-            if (refresh_token.find("_refresh_") == std::string::npos) {
-                res.status = 401;
-                res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
-                return;
-            }
-
-            std::string user_id = "user_example";
-
-            std::string new_access_token = "new_access_" + generate_state_token();
-            std::string new_refresh_token = "new_refresh_" + generate_state_token();
-            
-            json response = {
-                {"access_token", new_access_token},
-                {"refresh_token", new_refresh_token}
-            };
-            
-            res.set_content(response.dump(), "application/json");
-            
+            body = json::parse(req.body);
         } catch (const json::exception& e) {
             res.status = 400;
-            res.set_content("{\"error\":\"Invalid JSON format\"}", "application/json");
+            res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+            return;
         }
+        
+        std::string refresh_token = body.value("refresh_token", "");
+    
+        if (refresh_token.empty()) {
+            res.status = 400;
+            res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
+            return;
+        }
+    
+        std::cout << "POST /refresh - refresh_token: " << refresh_token.substr(0, 20) << "..." << std::endl;
+
+        if (!jwt_handler->validate_token(refresh_token)) {
+            res.status = 401;
+            res.set_content("{\"error\":\"Invalid or expired refresh token\"}", "application/json");
+            return;
+        }
+
+        if (!jwt_handler->is_refresh_token(refresh_token)) {
+            res.status = 401;
+            res.set_content("{\"error\":\"Not a refresh token\"}", "application/json");
+            return;
+        }
+
+        auto email_opt = jwt_handler->get_email(refresh_token);
+        if (!email_opt) {
+            res.status = 401;
+            res.set_content("{\"error\":\"Cannot extract email from token\"}", "application/json");
+            return;
+        }
+
+        auto user_opt = mongo_db->find_user_by_email(*email_opt);
+        if (!user_opt) {
+            res.status = 404;
+            res.set_content("{\"error\":\"User not found\"}", "application/json");
+            return;
+        }
+    
+        User user = *user_opt;
+        auto user_id_opt = jwt_handler->get_user_id(refresh_token);
+        std::string user_id = user_id_opt ? *user_id_opt : "user_" + *email_opt;
+
+        std::vector<std::string> permissions = JWTHandler::get_permissions_for_roles(user.roles);
+    
+        std::string new_access_token = jwt_handler->generate_access_token(
+            user_id, *email_opt, user.roles, permissions
+        );
+    
+        std::string new_refresh_token = jwt_handler->generate_refresh_token(user_id, *email_opt);
+
+        json response = {
+            {"access_token", new_access_token},
+            {"refresh_token", new_refresh_token}
+        };
+    
+        res.set_content(response.dump(), "application/json");
     });
     
     // выход из системы
     server.Post("/logout", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        
+    
+        json body;
         try {
-            json body = json::parse(req.body);
-            std::string refresh_token = body.value("refresh_token", "");
-            
-            if (refresh_token.empty()) {
-                res.status = 400;
-                res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
-                return;
-            }
-            
-            std::cout << "POST /logout - refresh_token: " << refresh_token << std::endl;
-            
-            if (refresh_token.find("_refresh_") == std::string::npos) {
-                res.status = 401;
-                res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
-                return;
-            }
-            
-            json response = {
-                {"message", "Logged out successfully"}
-            };
-            
-            res.set_content(response.dump(), "application/json");
-            
+            body = json::parse(req.body);
         } catch (const json::exception& e) {
             res.status = 400;
-            res.set_content("{\"error\":\"Invalid JSON format\"}", "application/json");
+            res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+            return;
         }
+        
+        std::string refresh_token = body.value("refresh_token", "");
+        bool all_devices = body.value("all_devices", false);
+    
+        if (refresh_token.empty()) {
+            res.status = 400;
+            res.set_content("{\"error\":\"refresh_token is required\"}", "application/json");
+            return;
+        }
+    
+        std::cout << "POST /logout - refresh_token: " << refresh_token.substr(0, 20) << "..." 
+            << ", all_devices: " << (all_devices ? "true" : "false") << std::endl;
+
+        auto email_opt = jwt_handler->get_email(refresh_token);
+        if (!email_opt) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
+            return;
+        }
+    
+        if (mongo_db->remove_refresh_token(*email_opt, refresh_token)) {
+            std::cout << "Refresh token removed from database" << std::endl;
+        } else {
+            std::cout << "WARNING: Could not remove refresh token from database" << std::endl;
+        }
+        
+        json response = {
+            {"message", "Logged out successfully"}
+        };
+    
+        res.set_content(response.dump(), "application/json");
     });
 }
