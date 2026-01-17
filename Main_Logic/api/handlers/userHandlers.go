@@ -247,7 +247,7 @@ func ChangeUserNameHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s (id=%d)", r.Method, r.URL.Path, id)
 
 	var req struct {
-		NewName string `json:"new_name"`
+		NewName string `json:"name"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
