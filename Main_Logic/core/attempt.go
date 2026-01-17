@@ -441,3 +441,14 @@ func CheckAttempt(userID, testID int) (AttemptCheckResult, error) {
 	res.Answers = answers
 	return res, nil
 }
+
+func GetScore(attemptID int) (int, error) {
+	query := "SELECT score FROM attempt WHERE id = $1"
+	row := storage.DB.QueryRow(query, attemptID)
+	var score int
+	if err := row.Scan(&score); err != nil {
+		return 0, fmt.Errorf("Score not found: %v", err)
+	}
+
+	return score, nil
+}

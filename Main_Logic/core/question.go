@@ -17,6 +17,11 @@ type AnswerOption struct {
 	IsCorrect bool   `json:"is_correct"`
 }
 
+type AnswerOptionInput struct {
+	Text      string `json:"text"`
+	IsCorrect bool   `json:"is_correct"`
+}
+
 // Question содержит информацию о вопросе и его вариантах ответов
 type Question struct {
 	ID      int            `json:"id"`
@@ -159,7 +164,7 @@ func GetQuestion(disciplineID, testID, questionID int, version int) (Question, e
 
 // CreateQuestion создаёт новый вопрос версии 1 с заданными вариантами ответов
 // Возвращает ID созданного вопроса
-func CreateQuestion(disciplineID, testID int, title string, text string, answers []AnswerOption) (int, error) {
+func CreateQuestion(disciplineID, testID int, title string, text string, answers []AnswerOptionInput) (int, error) {
 	if len(answers) == 0 {
 		return 0, fmt.Errorf("cannot create question without answer options")
 	}
