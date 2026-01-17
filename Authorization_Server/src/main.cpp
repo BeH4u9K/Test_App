@@ -28,13 +28,15 @@ int main() {
     }
     
     SessionStorage session_storage;
-    auto mongo_db = std::make_shared<MongoDB>("mongodb://localhost:27017", "auth_db");
+
+    auto mongo_db = std::make_shared<MongoDB>("mongodb_service", 5000);
     auto jwt_handler = std::make_shared<JWTHandler>(jwt_secret);
     
     Server server;
     register_handlers(server, session_storage, config, mongo_db, jwt_handler);
     
     std::cout << "Authorization Server started on " << host << ":" << port << std::endl;
+    std::cout << "MongoDB service: mongodb_service:5000" << std::endl;
     server.listen(host.c_str(), port);
     return 0;
 }

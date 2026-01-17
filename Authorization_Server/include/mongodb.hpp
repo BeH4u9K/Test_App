@@ -2,7 +2,10 @@
 #include <string>
 #include <vector>
 #include <optional>
-#include <memory>
+#include "../libs/httplib.h"
+#include "../libs/json/json.hpp"
+
+using json = nlohmann::json;
 
 struct User {
     std::string email;
@@ -12,9 +15,11 @@ struct User {
 };
 
 class MongoDB {
+private:
+    httplib::Client client_;
+    
 public:
-    MongoDB(const std::string& connection_string, const std::string& db_name);
-    ~MongoDB();
+    MongoDB(const std::string& host, int port = 5000);
     
     std::optional<User> find_user_by_email(const std::string& email);
     
@@ -24,11 +29,4 @@ public:
     bool add_refresh_token(const std::string& email, const std::string& refresh_token);
     
     bool remove_refresh_token(const std::string& email, const std::string& refresh_token);
-    
-private:
-    std::string db_path_;
-    void save_to_file(const std::string& filename, const std::string& content);
-    std::string load_from_file(const std::string& filename);
-    std::string user_to_json(const User& user);
-    std::optional<User> json_to_user(const std::string& json_str);
 };

@@ -1,41 +1,49 @@
+version: '3.8'
+
 services:
-  auth-server:
+  mongodb:
+    image: mongo:latest
+    container_name: auth_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - auth_network
+
+  mongodb_service:
+    build: ./mongodb_service
+    container_name: mongodb_service
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/auth_db
+    networks:
+      - auth_network
+
+  auth_server:
     build: .
-    container_name: authorization-server
+    container_name: auth_server
+    restart: always
     ports:
       - "8080:8080"
+    depends_on:
+      - mongodb_service
     volumes:
-      - ./config:/app/config:ro
-      - ./logs:/app/logs
-      - ./src:/app/src
-      - ./include:/app/include
-      - ./libs:/app/libs
-    environment:
-      - TZ=Europe/Moscow
-      - LOG_LEVEL=DEBUG
-      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-      - SSL_CERT_DIR=/etc/ssl/certs
-    command: ./authorization_server
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    tty: true
-    stdin_open: true
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
+      - ./config:/app/config
     networks:
-      - auth-network
+      - auth_network
 
 networks:
-  auth-network:
+  auth_network:
     driver: bridge
-    name: auth-network
+
+volumes:
+  mongodb_data:
