@@ -2,7 +2,6 @@
 #include <random>
 #include <sstream>
 #include <iomanip>
-#include <iostream>
 
 using namespace httplib;
 
@@ -22,32 +21,4 @@ void set_cors_headers(Response& res) {
     res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept");
     res.set_header("Access-Control-Allow-Credentials", "true");
     res.set_header("Access-Control-Max-Age", "3600");
-}
-
-std::optional<std::string> http_post(
-    const std::string& host,
-    const std::string& path,
-    const std::string& body,
-    const std::string& content_type
-) {
-    Client cli(host);
-    cli.set_connection_timeout(10);
-    cli.set_read_timeout(10);
-    
-    std::cout << "HTTP POST to: " << host << path << std::endl;
-    
-    auto res = cli.Post(path.c_str(), body, content_type.c_str());
-    
-    if (res) {
-        std::cout << "Response status: " << res->status << std::endl;
-        if (res->status == 200) {
-            return res->body;
-        } else {
-            std::cerr << "Error response body: " << res->body << std::endl;
-        }
-    } else {
-        std::cerr << "ERROR: No response from server " << host << std::endl;
-    }
-    
-    return std::nullopt;
 }

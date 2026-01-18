@@ -2,3 +2,12 @@ cd Authorization_Server
 docker-compose build
 docker-compose up -d
 docker-compose logs -f auth_server
+
+
+docker exec -it auth_mongodb mongosh -u admin -p password123
+
+use auth_db
+
+db.users.deleteMany({})
+
+db.users.find().pretty()

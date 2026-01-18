@@ -17,13 +17,3 @@ void handle_code_callback(
     std::shared_ptr<JWTHandler> jwt_handler,
     std::shared_ptr<CodeAuthentication> code_auth
 );
-
-void handle_code_verify(
-    const httplib::Request& req,
-    httplib::Response& res,
-    SessionStorage& storage,
-    const nlohmann::json& config,
-    std::shared_ptr<MongoDB> mongo_db,
-    std::shared_ptr<JWTHandler> jwt_handler,
-    std::shared_ptr<CodeAuthentication> code_auth
-);

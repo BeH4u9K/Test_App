@@ -1,31 +1,21 @@
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
-from bson import ObjectId
+from bson import ObjectId, json_util
 import json
-from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
 
 client = MongoClient("mongodb://admin:password123@mongodb:27017/")
 db = client.auth_db
 users_collection = db.users
 
-class JSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, ObjectId):
-            return str(o)
-        return json.JSONEncoder.default(self, o)
-
 @app.route('/find_user', methods=['GET'])
 def find_user():
     email = request.args.get('email')
-    
     user = users_collection.find_one({"email": email})
     
     if user:
-        user['_id'] = str(user['_id'])
-        return JSONEncoder().encode(user)
+        return json.loads(json_util.dumps(user))
     else:
         return jsonify({"error": "User not found"}), 404
 
@@ -39,14 +29,14 @@ def create_user():
     user_data = {
         "email": data['email'],
         "username": data['username'],
-        "roles": data.get('roles', ["Student"]),
+        "roles": ["Student"],
         "refresh_tokens": []
     }
     
     result = users_collection.insert_one(user_data)
     
     if result.inserted_id:
-        return jsonify({"success": True, "id": str(result.inserted_id)})
+        return jsonify({"success": True})
     else:
         return jsonify({"error": "Failed to create user"}), 500
 
@@ -73,14 +63,7 @@ def remove_refresh_token():
         {"$pull": {"refresh_tokens": data['refresh_token']}}
     )
     
-    if result.modified_count > 0:
-        return jsonify({"success": True})
-    else:
-        return jsonify({"success": True})
-
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "ok"})
+    return jsonify({"success": True})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
