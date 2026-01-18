@@ -13,7 +13,6 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s", r.Method, r.URL.Path)
 
 	var req struct {
-		ID    string `json:"id"`
 		Email string `json:"email"`
 	}
 
@@ -25,28 +24,18 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := core.RegisterUser(req.Email, req.ID)
+	id, err := core.RegisterUser(req.Email)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
-
-		switch err {
-		case core.ErrInvalidEmail, core.ErrEmptyFullName:
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
-		case core.ErrEmailExists:
-			w.WriteHeader(http.StatusConflict)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "email already exists"})
-		default:
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "internal server error"})
-		}
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ResponseMessage{Message: "User succesfuly registered"})
+	json.NewEncoder(w).Encode(IDResponse{ID: id})
 }
 
 func GetUserInfoHandler(w http.ResponseWriter, r *http.Request) {

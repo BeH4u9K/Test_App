@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"main_logic/storage"
 	"net/mail"
-	"strconv"
 	"time"
 )
 
@@ -65,29 +64,17 @@ func GetFullName(id int) (string, error) {
 
 }
 
-func RegisterUser(email string, userIDst string) error {
+func RegisterUser(email string) (int, error) {
 
-	userID, _ := strconv.Atoi(userIDst)
+	var id int
 
-	if !isValidEmail(email) {
-		return ErrInvalidEmail
-	}
-
-	query := "INSERT INTO users(email, id, full_name) VALUES($1, $2, '.')"
-	res, err := storage.DB.Exec(query, email, userID)
+	query := "INSERT INTO users(email, full_name) VALUES($1, '.') RETURNING id"
+	err := storage.DB.QueryRow(query, email).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("Exec error: %v", err)
+		return 0, fmt.Errorf("Scan error: %v", err)
 	}
 
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("RowsAffected error: %v", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("User already exists")
-	}
-	return nil
+	return id, nil
 
 }
 
