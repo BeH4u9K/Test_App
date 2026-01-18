@@ -69,7 +69,7 @@ func RegisterUser(email string, userID int) error {
 		return ErrInvalidEmail
 	}
 
-	query := "INSERT INTO users(email, id) VALUES($1, $2)"
+	query := "INSERT INTO users(email, id, full_name) VALUES($1, $2, '.')"
 	res, err := storage.DB.Exec(query, email, userID)
 	if err != nil {
 		return fmt.Errorf("Exec error: %v", err)
