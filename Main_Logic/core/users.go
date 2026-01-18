@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"main_logic/storage"
 	"net/mail"
+	"strconv"
 	"time"
 )
 
@@ -64,7 +65,10 @@ func GetFullName(id int) (string, error) {
 
 }
 
-func RegisterUser(email string, userID int) error {
+func RegisterUser(email string, userIDst string) error {
+
+	userID, _ := strconv.Atoi(userIDst)
+
 	if !isValidEmail(email) {
 		return ErrInvalidEmail
 	}
