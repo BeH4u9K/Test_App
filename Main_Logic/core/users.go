@@ -64,22 +64,30 @@ func GetFullName(id int) (string, error) {
 
 }
 
-func RegisterUser(email string, fullName string, userID int) (int, error) {
+func RegisterUser(email string, fullName string, userID int) error {
 	if !isValidEmail(email) {
-		return 0, ErrInvalidEmail
+		return ErrInvalidEmail
 	}
 	if fullName == "" {
-		return 0, ErrEmptyFullName
+		return ErrEmptyFullName
 	}
 
-	var id int
 	query := "INSERT INTO users(email, full_name, id) VALUES($1, $2, $3) RETURNING id"
-	err := storage.DB.QueryRow(query, email, fullName, userID).Scan(&id)
+	res, err := storage.DB.Exec(query, email, fullName, userID)
 	if err != nil {
-		return 0, ErrEmailExists
+		return fmt.Errorf("Exec error: %v", err)
 	}
 
-	return id, nil
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("RowsAffected error: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("User already exists")
+	}
+	return nil
+
 }
 
 // GetUserData возвращает информацию о пользователе (курсы, тесты, оценки)

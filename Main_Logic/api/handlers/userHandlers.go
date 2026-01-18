@@ -33,7 +33,7 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := core.RegisterUser(req.Email, req.FullName, req.ID)
+	err := core.RegisterUser(req.Email, req.FullName, req.ID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -54,7 +54,7 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(IDResponse{ID: id})
+	json.NewEncoder(w).Encode(ResponseMessage{Message: "User name changed successfully"})
 }
 
 func GetUserInfoHandler(w http.ResponseWriter, r *http.Request) {
