@@ -63,19 +63,33 @@ func GetFullName(id int) (string, error) {
 	return res, nil
 
 }
-
 func RegisterUser(email string) (int, error) {
+	if !isValidEmail(email) {
+		return 0, ErrInvalidEmail
+	}
 
+	// Сначала проверяем, существует ли уже пользователь
+	var existingID int
+	checkQuery := "SELECT id FROM users WHERE email = $1"
+	err := storage.DB.QueryRow(checkQuery, email).Scan(&existingID)
+
+	if err == nil {
+		// Пользователь существует - возвращаем его ID
+		return existingID, nil
+	} else if err != sql.ErrNoRows {
+		// Другая ошибка БД
+		return 0, fmt.Errorf("database error: %v", err)
+	}
+
+	// Пользователь не существует - создаем нового
 	var id int
-
 	query := "INSERT INTO users(email, full_name) VALUES($1, '.') RETURNING id"
-	err := storage.DB.QueryRow(query, email).Scan(&id)
+	err = storage.DB.QueryRow(query, email).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("Scan error: %v", err)
+		return 0, fmt.Errorf("insert error: %v", err)
 	}
 
 	return id, nil
-
 }
 
 // GetUserData возвращает информацию о пользователе (курсы, тесты, оценки)
