@@ -27,8 +27,28 @@ void set_cors_headers(Response& res) {
 
 void send_user_to_main_module(const std::string& email) {
     httplib::Client cli("localhost", 8081);
+    cli.set_connection_timeout(5);
+    cli.set_read_timeout(5);
     
     json request_data = {{"email", email}};
     
-    cli.Post("/users", request_data.dump(), "application/json");
+    std::string json_body = request_data.dump();
+    std::cout << "Sending to main module: " << json_body << std::endl;
+    
+    auto res = cli.Post("/users", json_body, "application/json");
+    
+    if (res) {
+        std::cout << "Main module response - Status: " << res->status << std::endl;
+        std::cout << "Main module response - Body: " << res->body << std::endl;
+        
+        if (res->status == 200) {
+            std::cout << "✓ User data sent to main module: " << email << std::endl;
+        } else {
+            std::cerr << "✗ Main module returned error: " << res->status << " - " << res->body << std::endl;
+        }
+    } else {
+        auto err = res.error();
+        std::cerr << "✗ Failed to connect to main module. Error: " << httplib::to_string(err) << std::endl;
+        std::cerr << "  Make sure main module is running on localhost:8081" << std::endl;
+    }
 }
