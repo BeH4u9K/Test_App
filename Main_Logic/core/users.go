@@ -64,7 +64,7 @@ func GetFullName(id int) (string, error) {
 
 }
 
-func RegisterUser(email string, fullName string) (int, error) {
+func RegisterUser(email string, fullName string, userID int) (int, error) {
 	if !isValidEmail(email) {
 		return 0, ErrInvalidEmail
 	}
@@ -73,8 +73,8 @@ func RegisterUser(email string, fullName string) (int, error) {
 	}
 
 	var id int
-	query := "INSERT INTO users(email, full_name) VALUES($1, $2) RETURNING id"
-	err := storage.DB.QueryRow(query, email, fullName).Scan(&id)
+	query := "INSERT INTO users(email, full_name, id) VALUES($1, $2, $3) RETURNING id"
+	err := storage.DB.QueryRow(query, email, fullName, userID).Scan(&id)
 	if err != nil {
 		return 0, ErrEmailExists
 	}

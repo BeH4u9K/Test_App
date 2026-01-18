@@ -13,6 +13,7 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s", r.Method, r.URL.Path)
 
 	var req struct {
+		ID       int    `json:"id"`
 		Email    string `json:"email"`
 		FullName string `json:"full_name"`
 	}
@@ -32,7 +33,7 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := core.RegisterUser(req.Email, req.FullName)
+	id, err := core.RegisterUser(req.Email, req.FullName, req.ID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
