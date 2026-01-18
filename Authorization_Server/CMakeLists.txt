@@ -16,15 +16,16 @@ set(SOURCES
     src/oauth_yandex.cpp
     src/utils.cpp
     src/mongodb.cpp
+    src/oauth_code.cpp
 )
 
-add_executable(authorization_server ${SOURCES})
+add_executable(auth_server ${SOURCES})
 
-target_include_directories(authorization_server PRIVATE 
+target_include_directories(auth_server PRIVATE 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/libs
     /usr/local/include
 )
 
 find_package(OpenSSL REQUIRED)
-target_link_libraries(authorization_server PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(auth_server PRIVATE OpenSSL::SSL OpenSSL::Crypto)

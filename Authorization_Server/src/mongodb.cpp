@@ -1,65 +1,91 @@
 #include "../include/mongodb.hpp"
 #include <iostream>
-#include <random>
 
-class MongoDB::Impl {
-public:
-    Impl(const std::string& connection_string, const std::string& db_name) {
-        std::cout << "MongoDB connecting to: " << connection_string 
-                  << ", database: " << db_name << std::endl;
-    }
+MongoDB::MongoDB(const std::string& host, int port) 
+    : client_(host, port) {
     
-    ~Impl() {
-        std::cout << "MongoDB disconnecting" << std::endl;
-    }
-    
-    std::optional<User> find_user_by_email(const std::string& email) {
-        std::cout << "MongoDB: Searching for user with email: " << email << std::endl;
-        // заглушка
-        return std::nullopt;
-    }
-    
-    bool create_user(const std::string& email, const std::string& username, 
-                    const std::vector<std::string>& roles) {
-        std::cout << "MongoDB: Creating new user - Email: " << email 
-                  << ", Username: " << username << ", Roles: ";
-        for (const auto& role : roles) {
-            std::cout << role << " ";
-        }
-        std::cout << std::endl;
-        return true;
-    }
-    
-    bool add_refresh_token(const std::string& email, const std::string& refresh_token) {
-        std::cout << "MongoDB: Adding refresh token to user " << email 
-                  << " (token: " << refresh_token.substr(0, 10) << "...)" << std::endl;
-        return true;
-    }
-    
-    bool remove_refresh_token(const std::string& email, const std::string& refresh_token) {
-        std::cout << "MongoDB: Removing refresh token from user " << email << std::endl;
-        return true;
-    }
-};
-
-MongoDB::MongoDB(const std::string& connection_string, const std::string& db_name)
-    : pimpl_(std::make_unique<Impl>(connection_string, db_name)) {}
-
-MongoDB::~MongoDB() = default;
+    std::cout << "MongoDB HTTP client connected to: " << host << ":" << port << std::endl;
+}
 
 std::optional<User> MongoDB::find_user_by_email(const std::string& email) {
-    return pimpl_->find_user_by_email(email);
+    auto res = client_.Get(("/find_user?email=" + email).c_str());
+    
+    if (res && res->status == 200) {
+        try {
+            json j = json::parse(res->body);
+            
+            User user;
+            user.email = j["email"].get<std::string>();
+            user.username = j["username"].get<std::string>();
+            
+            // Роли
+            for (const auto& role : j["roles"]) {
+                user.roles.push_back(role.get<std::string>());
+            }
+            
+            // Refresh токены
+            if (j.contains("refresh_tokens")) {
+                for (const auto& token : j["refresh_tokens"]) {
+                    user.refresh_tokens.push_back(token.get<std::string>());
+                }
+            }
+            
+            std::cout << "MongoDB: Found user - " << email << std::endl;
+            return user;
+        } catch (...) {
+            std::cerr << "MongoDB: Failed to parse response" << std::endl;
+        }
+    }
+    
+    std::cout << "MongoDB: User not found - " << email << std::endl;
+    return std::nullopt;
 }
 
 bool MongoDB::create_user(const std::string& email, const std::string& username, 
                          const std::vector<std::string>& roles) {
-    return pimpl_->create_user(email, username, roles);
+    
+    json j;
+    j["email"] = email;
+    j["username"] = username;
+    j["roles"] = roles;
+    
+    auto res = client_.Post("/create_user", j.dump(), "application/json");
+    
+    if (res && res->status == 200) {
+        std::cout << "MongoDB: Created user - " << email << std::endl;
+        return true;
+    }
+    
+    std::cout << "MongoDB: Failed to create user - " << email << std::endl;
+    return false;
 }
 
 bool MongoDB::add_refresh_token(const std::string& email, const std::string& refresh_token) {
-    return pimpl_->add_refresh_token(email, refresh_token);
+    json j;
+    j["email"] = email;
+    j["refresh_token"] = refresh_token;
+    
+    auto res = client_.Post("/add_refresh_token", j.dump(), "application/json");
+    
+    if (res && res->status == 200) {
+        std::cout << "MongoDB: Added refresh token for - " << email << std::endl;
+        return true;
+    }
+    
+    return false;
 }
 
 bool MongoDB::remove_refresh_token(const std::string& email, const std::string& refresh_token) {
-    return pimpl_->remove_refresh_token(email, refresh_token);
+    json j;
+    j["email"] = email;
+    j["refresh_token"] = refresh_token;
+    
+    auto res = client_.Post("/remove_refresh_token", j.dump(), "application/json");
+    
+    if (res) {
+        std::cout << "MongoDB: Removed refresh token for - " << email << std::endl;
+        return true;
+    }
+    
+    return false;
 }

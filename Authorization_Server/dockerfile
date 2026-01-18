@@ -1,17 +1,14 @@
 FROM ubuntu:22.04
 
-ENV TZ=Europe/Moscow
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     libssl-dev \
-    ca-certificates \
-    git \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
 COPY . .
 
 RUN mkdir -p build && cd build && \
@@ -20,4 +17,4 @@ RUN mkdir -p build && cd build && \
 
 EXPOSE 8080
 
-CMD ["./build/authorization_server"]
+CMD ["./build/auth_server"]

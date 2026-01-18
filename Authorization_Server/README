@@ -1,2 +1,4 @@
 cd Authorization_Server
-docker-compose up --build
+docker-compose build
+docker-compose up -d
+docker-compose logs -f auth_server
