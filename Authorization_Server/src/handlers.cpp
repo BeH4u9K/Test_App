@@ -28,6 +28,7 @@ void register_handlers(
         
         std::string provider = req.get_param_value("provider");
         std::string login_token = req.get_param_value("login_token");
+        std::string user_id_front = req.get_param_value("user_ID");
         
         if (provider.empty() || login_token.empty()) {
             res.status = 400;
@@ -40,6 +41,7 @@ void register_handlers(
             login_token,
             oauth_state,
             provider,
+            user_id_front,
             std::chrono::system_clock::now() + std::chrono::minutes(5),
             AuthStatus::PENDING,
             std::nullopt,
@@ -55,29 +57,22 @@ void register_handlers(
             std::string client_id = config["github"]["client_id"].get<std::string>();
             std::string redirect_uri = config["github"]["redirect_uri"].get<std::string>();
             std::string url = "https://github.com/login/oauth/authorize?client_id=" + client_id + 
-                             "&redirect_uri=" + redirect_uri + "&response_type=code&state=" + oauth_state + 
-                             "&scope=user:email";
+                "&redirect_uri=" + redirect_uri + "&response_type=code&state=" + oauth_state + "&scope=user:email";
             
             response["auth_url"] = url;
-            response["redirect_required"] = true;
             
         } else if (provider == "yandex") {
             std::string client_id = config["yandex"]["client_id"].get<std::string>();
             std::string redirect_uri = config["yandex"]["redirect_uri"].get<std::string>();
             std::string url = "https://oauth.yandex.ru/authorize?response_type=code&client_id=" + 
-                             client_id + "&redirect_uri=" + redirect_uri + "&state=" + oauth_state;
+                client_id + "&redirect_uri=" + redirect_uri + "&state=" + oauth_state;
             
             response["auth_url"] = url;
-            response["redirect_required"] = true;
             
         } else if (provider == "code") {
             std::string auth_code = code_auth->generate_code(login_token);
             response["code"] = auth_code;
             response["expires_in"] = 60;
-        } else {
-            res.status = 400;
-            res.set_content("{\"error\":\"Unsupported provider\"}", "application/json");
-            return;
         }
         
         res.set_content(response.dump(), "application/json");

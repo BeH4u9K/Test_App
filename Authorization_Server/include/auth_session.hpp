@@ -14,6 +14,7 @@ struct AuthSession {
     std::string login_token;
     std::string oauth_state;
     std::string provider;
+    std::string user_id_front;
     
     std::chrono::system_clock::time_point expires_at;
     AuthStatus status;

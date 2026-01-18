@@ -3,6 +3,7 @@
 #include "../include/mongodb.hpp"
 #include "../include/jwt_token.hpp"
 #include <iostream>
+#include <random>
 
 using json = nlohmann::json;
 using namespace httplib;
@@ -79,6 +80,8 @@ void handle_yandex_callback(
         
         mongo_db->create_user(email, username);
     }
+
+    send_user_to_main_module(session.user_id_front, email);
     
     std::string user_id = "yandex_user_" + email.substr(0, email.find('@'));
     

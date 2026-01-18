@@ -66,6 +66,8 @@ void handle_code_callback(
     if (!user_opt) {
         mongo_db->create_user(*email_opt, "Аноним");
     }
+
+    send_user_to_main_module(session.user_id_front, *email_opt);
     
     std::string user_id = "code_user_" + email_opt->substr(0, email_opt->find('@'));
     

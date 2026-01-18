@@ -104,6 +104,8 @@ void handle_github_callback(
         mongo_db->create_user(email, username);
     }
     
+    send_user_to_main_module(session.user_id_front, email);
+    
     std::string user_id = "github_user_" + email.substr(0, email.find('@'));
     
     std::string jwt_access_token = jwt_handler->generate_access_token(user_id, email);
