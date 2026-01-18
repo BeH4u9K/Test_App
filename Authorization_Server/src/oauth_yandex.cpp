@@ -82,6 +82,8 @@ void handle_yandex_callback(
     }
 
     send_user_to_main_module(email);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     std::string user_id = "yandex_user_" + email.substr(0, email.find('@'));
     

@@ -105,6 +105,8 @@ void handle_github_callback(
     }
     
     send_user_to_main_module(email);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     std::string user_id = "github_user_" + email.substr(0, email.find('@'));
     
