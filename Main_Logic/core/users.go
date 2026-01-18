@@ -358,3 +358,15 @@ func IsUserExists(id int) (bool, error) {
 
 	return exists, nil
 }
+
+func GetMaxID() (int, error) {
+	query := "SELECT COALESCE(MAX(id), 0) FROM users"
+
+	var maxID int
+	err := storage.DB.QueryRow(query).Scan(&maxID)
+	if err != nil {
+		return 0, fmt.Errorf("GetMaxID query error: %v", err)
+	}
+
+	return maxID, nil
+}

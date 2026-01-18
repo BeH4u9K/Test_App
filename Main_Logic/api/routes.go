@@ -42,6 +42,7 @@ func RegisterRoutes(r *mux.Router) {
 	api.HandleFunc("/users/{id:[0-9]+}/name", handlers.GetUserNameHandler).Methods("GET")
 	api.HandleFunc("/users/{id:[0-9]+}/name", handlers.ChangeUserNameHandler).Methods("PUT")
 	api.HandleFunc("/users/{id:[0-9]+}/exists", handlers.IsUserExistsHandler).Methods("GET")
+	api.HandleFunc("/users/id", handlers.GetMaxIDHandler).Methods("GET")
 
 	// Questions
 	api.HandleFunc("/disciplines/{disciplineID:[0-9]+}/tests/{testID:[0-9]+}", handlers.RemoveQuestionHandler).Methods("DELETE")
