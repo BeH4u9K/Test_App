@@ -380,17 +380,28 @@ func RemoveUser(userID, disciplineID int) error {
 
 	return nil
 }
-
-func CreateDiscipline(name, description string, teacher_id int) (int, error) {
+func CreateDiscipline(name, description string, teacherID int) (int, error) {
 	if name == "" || description == "" {
 		return 0, fmt.Errorf("name or description cannot be empty")
 	}
 
-	// Проверка, нет ли уже дисциплины с таким именем
+	// Проверяем, что учитель существует
+	exists, err := userExists(teacherID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check teacher: %v", err)
+	}
+	if !exists {
+		return 0, fmt.Errorf("teacher with id %d not found", teacherID)
+	}
+
+	// Проверяем, есть ли уже НЕудалённая дисциплина с таким именем
 	var existsDiscipline bool
-	checkQuery := `SELECT EXISTS(
-        SELECT 1 FROM discipline WHERE name = $1
-    );`
+	checkQuery := `
+        SELECT EXISTS(
+            SELECT 1 FROM discipline
+            WHERE name = $1 AND is_deleted = FALSE
+        );
+    `
 	if err := storage.DB.QueryRow(checkQuery, name).Scan(&existsDiscipline); err != nil {
 		return 0, fmt.Errorf("failed to check discipline name: %v", err)
 	}
@@ -398,20 +409,14 @@ func CreateDiscipline(name, description string, teacher_id int) (int, error) {
 		return 0, fmt.Errorf("discipline with name %s already exists", name)
 	}
 
-	exists, err := userExists(teacher_id)
-	if err != nil {
-		return 0, fmt.Errorf("failed to check teacher: %v", err)
-	}
-	if !exists {
-		return 0, fmt.Errorf("teacher with id %d not found", teacher_id)
-	}
-
+	// Создаём новую дисциплину
 	var id int
-	query := `INSERT INTO discipline(teacher_id, name, description)
-              VALUES ($1, $2, $3)
-              RETURNING id;`
-	row := storage.DB.QueryRow(query, teacher_id, name, description)
-	if err := row.Scan(&id); err != nil {
+	query := `
+        INSERT INTO discipline (teacher_id, name, description, is_deleted)
+        VALUES ($1, $2, $3, FALSE)
+        RETURNING id;
+    `
+	if err := storage.DB.QueryRow(query, teacherID, name, description).Scan(&id); err != nil {
 		return 0, fmt.Errorf("failed to create discipline: %v", err)
 	}
 

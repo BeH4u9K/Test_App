@@ -295,7 +295,7 @@ type UserShort struct {
 }
 
 func GetAllUsers() ([]UserShort, error) {
-	query := "SELECT id, full_name FROM users WHERE is_blocked = FALSE ORDER BY id"
+	query := "SELECT id, full_name FROM users ORDER BY id"
 	rows, err := storage.DB.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("select users error: %v", err)

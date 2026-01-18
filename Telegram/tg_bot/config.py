@@ -11,5 +11,6 @@ class Config:
     REDIS_DB=int(os.getenv("REDIS_DB",0))
 
     AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://localhost:8080")
-
+    MAIN_MODULE_URL = os.getenv("MAIN_MODULE_URL", "http://localhost:8081")
+    
 config = Config()
