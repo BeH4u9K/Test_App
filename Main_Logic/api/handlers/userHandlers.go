@@ -267,3 +267,23 @@ func ChangeUserNameHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ResponseMessage{Message: "User name changed successfully", Data: req.NewName})
 }
+
+func IsUserExistsHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := GetIDFromVars(w, r, "id")
+	if err != nil {
+		return
+	}
+
+	exists, err := core.IsUserExists(id)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"is_exists": exists})
+
+}

@@ -64,16 +64,13 @@ func GetFullName(id int) (string, error) {
 
 }
 
-func RegisterUser(email string, fullName string, userID int) error {
+func RegisterUser(email string, userID int) error {
 	if !isValidEmail(email) {
 		return ErrInvalidEmail
 	}
-	if fullName == "" {
-		return ErrEmptyFullName
-	}
 
-	query := "INSERT INTO users(email, full_name, id) VALUES($1, $2, $3) RETURNING id"
-	res, err := storage.DB.Exec(query, email, fullName, userID)
+	query := "INSERT INTO users(email, id) VALUES($1, $2)"
+	res, err := storage.DB.Exec(query, email, userID)
 	if err != nil {
 		return fmt.Errorf("Exec error: %v", err)
 	}
@@ -356,4 +353,17 @@ func ChangeUserName(id int, newName string) error {
 	}
 
 	return nil
+}
+
+func IsUserExists(id int) (bool, error) {
+
+	var exists bool
+
+	query := "SELECT 1 FROM users WHERE id = $1"
+
+	if err := storage.DB.QueryRow(query, id).Scan(&exists); err != nil {
+		return false, fmt.Errorf("Scan error: %v", err)
+	}
+
+	return exists, nil
 }
