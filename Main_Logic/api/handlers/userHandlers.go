@@ -20,40 +20,39 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("ERROR: Failed to decode request: %v", err)
-		writeValidationError(w, "Invalid request body")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	if req.Email == "" {
-		writeValidationError(w, "Email is required")
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	id, err := core.RegisterUser(req.Email)
+	// Просто вызываем регистрацию, игнорируем возвращаемое значение
+	_, err := core.RegisterUser(req.Email)
 	if err != nil {
-		log.Printf("ERROR: %v", err)
-		w.Header().Set("Content-Type", "application/json")
+		log.Printf("ERROR: Failed to register user: %v", err)
 
+		// Для разных ошибок возвращаем разные статусы, но без тела
 		switch err {
 		case core.ErrInvalidEmail:
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid email format"})
+		case core.ErrEmailExists:
+			// Если пользователь уже существует - это не ошибка для нас
+			// Просто выходим с 200 OK
+			w.WriteHeader(http.StatusOK)
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
 		}
 		return
 	}
 
-	log.Printf("User registered/retrieved - Email: %s, ID: %d", req.Email, id)
+	log.Printf("User registered/retrieved - Email: %s", req.Email)
 
-	w.Header().Set("Content-Type", "application/json")
-
-	// Возвращаем 200 OK если пользователь уже существовал
-	// Или 201 Created если был создан новый
-	// Но для простоты всегда возвращаем 200
+	// Просто возвращаем 200 OK без тела ответа
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(IDResponse{ID: id})
+	// Пустое тело - ничего не пишем
 }
 
 func GetUserInfoHandler(w http.ResponseWriter, r *http.Request) {
