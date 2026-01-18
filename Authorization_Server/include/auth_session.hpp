@@ -4,18 +4,17 @@
 #include <optional>
 
 enum class AuthStatus {
-    PENDING, // не получен
-    GRANTED, // доступ предоставлен 
-    DENIED, // в доступе отказано
-    EXPIRED // время действия токена закончилось
+    PENDING,
+    GRANTED,
+    DENIED,
+    EXPIRED
 };
 
 struct AuthSession {
     std::string login_token;
     std::string oauth_state;
-    std::string provider; // github, yandex, code
+    std::string provider;
     
-    std::chrono::system_clock::time_point created_at;
     std::chrono::system_clock::time_point expires_at;
     AuthStatus status;
 

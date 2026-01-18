@@ -29,16 +29,12 @@ public:
             code = std::to_string(dis(gen));
         } while (codes_.find(code) != codes_.end());
         
-        auto now = std::chrono::system_clock::now();
         CodeEntry entry{
             login_token,
-            now + std::chrono::minutes(1)
+            std::chrono::system_clock::now() + std::chrono::minutes(1)
         };
         
         codes_[code] = entry;
-
-        cleanup_expired();
-        
         return code;
     }
 
@@ -60,16 +56,5 @@ public:
     void remove_code(const std::string& code) {
         std::lock_guard<std::mutex> lock(mutex_);
         codes_.erase(code);
-    }
-
-    void cleanup_expired() {
-        auto now = std::chrono::system_clock::now();
-        for (auto it = codes_.begin(); it != codes_.end(); ) {
-            if (now > it->second.expires_at) {
-                it = codes_.erase(it);
-            } else {
-                ++it;
-            }
-        }
     }
 };
