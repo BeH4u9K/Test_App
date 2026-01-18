@@ -272,3 +272,17 @@ func IsUserExistsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"is_exists": exists})
 
 }
+
+func GetMaxIDHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := core.GetMaxID()
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(IDResponse{ID: id})
+
+}
