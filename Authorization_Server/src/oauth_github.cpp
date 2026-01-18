@@ -2,6 +2,7 @@
 #include "../include/utils.hpp"
 #include "../include/mongodb.hpp"
 #include "../include/jwt_token.hpp"
+#include "../include/permissions.hpp"
 #include <iostream>
 #include <random>
 
@@ -104,19 +105,17 @@ void handle_github_callback(
         mongo_db->create_user(email, username);
     }
     
-    send_user_to_main_module(session.user_id_front, email);
+    send_user_to_main_module(email);
     
-    std::string user_id = "github_user_" + email.substr(0, email.find('@'));
-    
-    std::string jwt_access_token = jwt_handler->generate_access_token(user_id, email);
-    std::string jwt_refresh_token = jwt_handler->generate_refresh_token(user_id, email);
+    std::vector<std::string> permissions = get_user_permissions(email);
+    std::string jwt_access_token = jwt_handler->generate_access_token(permissions);
+    std::string jwt_refresh_token = jwt_handler->generate_refresh_token(email);
     
     mongo_db->add_refresh_token(email, jwt_refresh_token);
     
     session.status = AuthStatus::GRANTED;
     session.access_token = jwt_access_token;
     session.refresh_token = jwt_refresh_token;
-    session.user_id = user_id;
     
     storage.update_session(session);
     

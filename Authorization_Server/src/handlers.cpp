@@ -28,7 +28,6 @@ void register_handlers(
         
         std::string provider = req.get_param_value("provider");
         std::string login_token = req.get_param_value("login_token");
-        std::string user_id_front = req.get_param_value("user_ID");
         
         if (provider.empty() || login_token.empty()) {
             res.status = 400;
@@ -41,7 +40,6 @@ void register_handlers(
             login_token,
             oauth_state,
             provider,
-            user_id_front,
             std::chrono::system_clock::now() + std::chrono::minutes(5),
             AuthStatus::PENDING,
             std::nullopt,
