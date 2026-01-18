@@ -13,7 +13,7 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s", r.Method, r.URL.Path)
 
 	var req struct {
-		ID    int    `json:"id"`
+		ID    string `json:"id"`
 		Email string `json:"email"`
 	}
 
@@ -22,10 +22,6 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	if err := decoder.Decode(&req); err != nil {
 		log.Printf("ERROR: Failed to decode request: %v", err)
 		writeValidationError(w, "Invalid request body")
-		return
-	}
-
-	if !requireNonEmpty(w, "email", req.Email) {
 		return
 	}
 
@@ -50,7 +46,7 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ResponseMessage{Message: "User name changed successfully"})
+	json.NewEncoder(w).Encode(ResponseMessage{Message: "User succesfuly registered"})
 }
 
 func GetUserInfoHandler(w http.ResponseWriter, r *http.Request) {

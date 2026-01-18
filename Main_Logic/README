@@ -1,2 +1,2 @@
-Main_Logic
-Test
+cd Main_Logic
+docker-compose up -d --build
