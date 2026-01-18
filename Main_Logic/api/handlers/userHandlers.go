@@ -13,8 +13,8 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s", r.Method, r.URL.Path)
 
 	var req struct {
-		Email    string `json:"email"`
-		FullName string `json:"full_name"`
+		ID    int    `json:"id"`
+		Email string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -28,11 +28,8 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireNonEmpty(w, "email", req.Email) {
 		return
 	}
-	if !requireNonEmpty(w, "full_name", req.FullName) {
-		return
-	}
 
-	id, err := core.RegisterUser(req.Email, req.FullName)
+	err := core.RegisterUser(req.Email, req.ID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -53,7 +50,7 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(IDResponse{ID: id})
+	json.NewEncoder(w).Encode(ResponseMessage{Message: "User name changed successfully"})
 }
 
 func GetUserInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -269,4 +266,24 @@ func ChangeUserNameHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(ResponseMessage{Message: "User name changed successfully", Data: req.NewName})
+}
+
+func IsUserExistsHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := GetIDFromVars(w, r, "id")
+	if err != nil {
+		return
+	}
+
+	exists, err := core.IsUserExists(id)
+	if err != nil {
+		log.Printf("ERROR: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"is_exists": exists})
+
 }
