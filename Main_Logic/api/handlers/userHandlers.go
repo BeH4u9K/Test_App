@@ -13,9 +13,8 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Request: %s %s", r.Method, r.URL.Path)
 
 	var req struct {
-		ID       int    `json:"id"`
-		Email    string `json:"email"`
-		FullName string `json:"full_name"`
+		ID    int    `json:"id"`
+		Email string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -29,11 +28,8 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	if !requireNonEmpty(w, "email", req.Email) {
 		return
 	}
-	if !requireNonEmpty(w, "full_name", req.FullName) {
-		return
-	}
 
-	err := core.RegisterUser(req.Email, req.FullName, req.ID)
+	err := core.RegisterUser(req.Email, req.ID)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
