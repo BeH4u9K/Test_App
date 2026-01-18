@@ -56,6 +56,42 @@ class RedisClient:
         key = f"user:{chat_id}"
         self.client.delete(key)
 
+    def get_all_anonymous_users(self):
+        """Получить всех анонимных пользователей"""
+        users = []
+        try:
+            for key in self.client.scan_iter(match="user:*"):
+                data = self.client.get(key)
+                if data:
+                    user_data = json.loads(data)
+                    if user_data.get("status") == "anonim":
+                        chat_id = int(key.split(":")[1])
+                        users.append({
+                            "chat_id": chat_id,
+                            "data": user_data
+                        })
+        except Exception as e:
+            print(f"Error getting anonymous users: {e}")
+        return users
+    
+    def get_all_authorized_users(self):
+        """Получить всех авторизованных пользователей"""
+        users = []
+        try:
+            for key in self.client.scan_iter(match="user:*"):
+                data = self.client.get(key)
+                if data:
+                    user_data = json.loads(data)
+                    if user_data.get("status") == "authorized":
+                        chat_id = int(key.split(":")[1])
+                        users.append({
+                            "chat_id": chat_id,
+                            "data": user_data
+                        })
+        except Exception as e:
+            print(f"Error getting authorized users: {e}")
+        return users
+
     def ping(self) -> bool:
         try:
             return self.client.ping()
