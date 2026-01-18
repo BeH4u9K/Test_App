@@ -25,7 +25,7 @@ void set_cors_headers(Response& res) {
     res.set_header("Access-Control-Max-Age", "3600");
 }
 
-bool send_user_to_main_module(const std::string& user_id, const std::string& email) {
+void send_user_to_main_module(const std::string& user_id, const std::string& email) {
     httplib::Client cli("localhost", 8081);
     
     json request_data = {
@@ -33,14 +33,5 @@ bool send_user_to_main_module(const std::string& user_id, const std::string& ema
         {"email", email}
     };
     
-    auto res = cli.Post("/users", request_data.dump(), "application/json");
-    
-    if (res && res->status == 200) {
-        std::cout << "User data sent to main module successfully" << std::endl;
-        return true;
-    } else {
-        std::cerr << "Failed to send user data to main module. Status: " 
-            << (res ? std::to_string(res->status) : "No response") << std::endl;
-        return false;
-    }
+    cli.Post("/users", request_data.dump(), "application/json");
 }

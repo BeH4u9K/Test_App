@@ -6,4 +6,4 @@
 
 std::string generate_state_token();
 void set_cors_headers(httplib::Response& res);
-bool send_user_to_main_module(const std::string& user_id, const std::string& email);
+void send_user_to_main_module(const std::string& user_id, const std::string& email);
