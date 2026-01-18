@@ -24,17 +24,35 @@ func RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Email == "" {
+		writeValidationError(w, "Email is required")
+		return
+	}
+
 	id, err := core.RegisterUser(req.Email)
 	if err != nil {
 		log.Printf("ERROR: %v", err)
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
+
+		switch err {
+		case core.ErrInvalidEmail:
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "Invalid email format"})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(ErrorResponse{Error: "Internal server error"})
+		}
 		return
 	}
 
+	log.Printf("User registered/retrieved - Email: %s, ID: %d", req.Email, id)
+
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+
+	// Возвращаем 200 OK если пользователь уже существовал
+	// Или 201 Created если был создан новый
+	// Но для простоты всегда возвращаем 200
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(IDResponse{ID: id})
 }
 
