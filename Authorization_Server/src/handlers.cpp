@@ -26,6 +26,8 @@ void register_handlers(
         
         std::string provider = req.get_param_value("provider");
         std::string login_token = req.get_param_value("login_token");
+
+        std::cout << "GET /auth - provider: " << provider << ", login_token: " << login_token << std::endl;
         
         if (provider.empty() || login_token.empty()) {
             res.status = 400;
@@ -45,6 +47,7 @@ void register_handlers(
                 "&redirect_uri=" + redirect_uri + "&response_type=code&state=" + login_token + "&scope=user:email";
             
             response["auth_url"] = url;
+            std::cout << "GitHub auth URL: " << url << std::endl;
             
         } else if (provider == "yandex") {
             std::string client_id = config["yandex"]["client_id"].get<std::string>();
@@ -54,6 +57,7 @@ void register_handlers(
                 client_id + "&redirect_uri=" + redirect_uri + "&state=" + login_token;
             
             response["auth_url"] = url;
+            std::cout << "Yandex auth URL: " << url << std::endl;
             
         }
         
@@ -74,6 +78,8 @@ void register_handlers(
         set_cors_headers(res);
         
         std::string login_token = req.get_param_value("login_token");
+
+        std::cout << "GET /check - login_token: " << login_token << std::endl;
         
         if (login_token.empty()) {
             res.status = 400;
@@ -122,36 +128,36 @@ void register_handlers(
 
     server.Post("/refresh", [&](const Request& req, Response& res) {
         set_cors_headers(res);
-        
+    
         json body = json::parse(req.body);
         std::string refresh_token = body.value("refresh_token", "");
-        
+    
         if (refresh_token.empty()) {
             res.status = 400;
             res.set_content("{\"error\":\"refresh_token required\"}", "application/json");
             return;
         }
-    
+
         if (!jwt_handler->validate_token(refresh_token)) {
             res.status = 401;
             res.set_content("{\"error\":\"Invalid refresh token\"}", "application/json");
             return;
         }
-        
+    
         auto email_opt = jwt_handler->get_email(refresh_token);
         if (!email_opt) {
             res.status = 401;
             res.set_content("{\"error\":\"Cannot extract email\"}", "application/json");
             return;
         }
-        
-        auto user_opt = mongo_db->find_user_by_email(*email_opt);
+    
+        auto user_opt = mongo_db->find_user(*email_opt);
         if (!user_opt) {
             res.status = 404;
             res.set_content("{\"error\":\"User not found\"}", "application/json");
             return;
         }
-        
+    
         User user = *user_opt;
 
         bool token_found = false;
@@ -161,7 +167,7 @@ void register_handlers(
                 break;
             }
         }
-        
+    
         if (!token_found) {
             res.status = 401;
             res.set_content("{\"error\":\"Refresh token not found in database\"}", "application/json");
@@ -174,13 +180,13 @@ void register_handlers(
         std::string new_refresh_token = jwt_handler->generate_refresh_token(*email_opt);
 
         mongo_db->remove_refresh_token(*email_opt, refresh_token);
-        mongo_db->add_refresh_token(*email_opt, new_refresh_token);
-        
+        mongo_db->add_tokens(*email_opt, new_access_token, new_refresh_token);
+    
         json response = {
             {"access_token", new_access_token},
             {"refresh_token", new_refresh_token}
         };
-        
+    
         res.set_content(response.dump(), "application/json");
     });
     
