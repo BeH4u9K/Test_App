@@ -1,16 +1,20 @@
-FROM node:20-alpine
+# Dockerfile
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Копируем файлы зависимостей
-COPY package.json package-lock.json ./
+# Копируем package.json и устанавливаем зависимости
+COPY package*.json ./
+RUN npm ci
 
-# Используем npm install вместо npm ci (более гибко)
-RUN npm install --no-optional --legacy-peer-deps
-
-# Копируем весь проект
+# Копируем все файлы проекта
 COPY . .
 
-EXPOSE 5173
+# Собираем фронтенд
+RUN npm run build
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Открываем порт сервера
+EXPOSE 3007
+
+# Запускаем сервер
+CMD ["node", "server.js"]

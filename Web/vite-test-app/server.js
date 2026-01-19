@@ -6,21 +6,10 @@ const app = express();
 const PORT = 3007;
 
 app.use((req, res, next) => {
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:3007',
-    'http://localhost:8080'
-  ];
-  
   const origin = req.headers.origin;
   
-  if (process.env.NODE_ENV === 'development') {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-  } else if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-  }
-  
+
+  res.header('Access-Control-Allow-Origin', origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
   res.header('Access-Control-Allow-Credentials', 'true');

@@ -1,80 +1,26 @@
 version: '3.8'
 
 services:
-  # 1. Nginx (прокси на все сервисы)
-  nginx:
-    image: nginx:alpine
-    container_name: auth-nginx
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - vite-app
-      - backend
-      - auth-server
-    restart: unless-stopped
-
-  # 2. Frontend (Vite приложение)
-  vite-app:
-    build: .
-    container_name: auth-frontend
-    volumes:
-      - .:/app
-      - /app/node_modules
-    environment:
-      - NODE_ENV=development
-      - CHOKIDAR_USEPOLLING=true
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
-      - redis
-      - auth-server
-
-  # 3. Backend (Express сервер - ваш server.js на порту 3007)
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: auth-backend
-    ports:
-      - "3007:3007"
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - AUTH_SERVER_URL=http://auth-server:8080
-    volumes:
-      - .:/app
-      - /app/node_modules
-    depends_on:
-      - redis
-      - auth-server
-
-  # 4. Auth Server (отдельный сервер авторизации)
-  auth-server:
-    build:
-      context: .
-      dockerfile: Dockerfile.auth
-    container_name: auth-server
-    ports:
-      - "8080:8080"
-    environment:
-      - NODE_ENV=development
-    volumes:
-      - .:/app
-      - /app/node_modules
-
-  # 5. Redis
+  # Redis должен быть ПЕРВЫМ, так как app делит с ним сеть
   redis:
     image: redis:alpine
-    container_name: auth-redis
+    container_name: vite-redis
     ports:
-      - "6379:6379"
+      - "6379:6379"  # только Redis порт
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes
-    restart: unless-stopped
+
+  # Основное приложение - делит сеть с Redis
+  app:
+    build: .
+    container_name: vite-app
+    # НЕ указываем ports здесь, так как сеть делится с Redis
+    environment:
+      - NODE_ENV=production
+    network_mode: "service:redis"  # делим сеть с Redis
+    depends_on:
+      - redis
 
 volumes:
   redis-data:
