@@ -266,7 +266,7 @@ const checkSession = async () => {
             animation: 'spin 1s linear infinite'
           }}></div>
           <div style={{ fontSize: '18px', color: '#2C3E50' }}>
-            🚪 Выход из системы...
+             Выход из системы...
           </div>
         </div>
       );
@@ -337,7 +337,7 @@ const checkSession = async () => {
           borderRadius: '50%',
           animation: 'spin 1s linear infinite'
         }}></div>
-        🔍 Проверка сессии...
+         Проверка сессии...
       </div>
     );
   }

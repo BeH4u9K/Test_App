@@ -121,20 +121,20 @@ function Home({ authState }) {
           {authState.status === 'anonymous' && (
             <ScenarioBox style={{ backgroundColor: '#F39C12' }}>
               <p style={{ fontSize: '14px', margin: 0 }}>
-                ✅ Сценарий выполнен: Web Client получил статус "Анонимный" из Redis
+                 Сценарий выполнен: Web Client получил статус "Анонимный" из Redis
               </p>
             </ScenarioBox>
           )}
           
           <SessionInfo>
             <h3 style={{ color: '#ECF0F1', marginTop: 0, borderBottom: '1px solid #7F8C8D', paddingBottom: '10px' }}>
-              📊 Информация о сессии
+               Информация о сессии
             </h3>
             
             <InfoItem>
               <InfoLabel>Статус:</InfoLabel>
               <div>
-                <span>{authState.status === 'anonymous' ? '👤 Анонимный' : '✅ Авторизован'}</span>
+                <span>{authState.status === 'anonymous' ? '👤 Анонимный' : ' Авторизован'}</span>
                 <StatusBadge status={authState.status}>
                   {authState.status}
                 </StatusBadge>
@@ -143,7 +143,7 @@ function Home({ authState }) {
             
             <InfoItem>
               <InfoLabel>Redis:</InfoLabel>
-              <InfoValue>{authState.isAuthenticated ? '✅ Ключ найден' : '❌ Ключ не найден'}</InfoValue>
+              <InfoValue>{authState.isAuthenticated ? ' Ключ найден' : ' Ключ не найден'}</InfoValue>
             </InfoItem>
             
             {authState.provider && (
@@ -203,7 +203,7 @@ function Home({ authState }) {
     return (
       <>
         <SessionInfo>
-          <h3 style={{ color: '#ECF0F1', marginTop: 0 }}>❌ Сессия не найдена</h3>
+          <h3 style={{ color: '#ECF0F1', marginTop: 0 }}> Сессия не найдена</h3>
           <p style={{ color: '#BDC3C7' }}>
             Кука session_token не найдена или сессия устарела в Redis.
           </p>
@@ -243,7 +243,7 @@ function Home({ authState }) {
   return (
     <Container>
       <Content>
-        <Title>🔐 Система авторизации</Title>
+        <Title> Система авторизации</Title>
         {renderAuthOptions()}
       </Content>
     </Container>

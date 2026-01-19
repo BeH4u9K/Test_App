@@ -10,3 +10,7 @@ use auth_db
 db.users.deleteMany({})
 
 db.users.find().pretty()
+
+
+curl "http://localhost:8080/auth?provider=github&login_token=test123"
+curl "http://localhost:8080/check?login_token=test123"

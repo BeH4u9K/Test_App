@@ -20,6 +20,8 @@ void handle_yandex_callback(
     std::string code = req.get_param_value("code");
     std::string state = req.get_param_value("state");
     std::string error = req.get_param_value("error");
+
+    std::cout << "Yandex callback received - code: " << code << ", state: " << state << std::endl;
     
     if (!error.empty()) {
         storage.update_session_status(state, AuthStatus::DENIED);
@@ -71,7 +73,9 @@ void handle_yandex_callback(
     json user_data = json::parse(user_res->body);
     std::string email = user_data["default_email"].get<std::string>();
 
-    auto user_opt = mongo_db->find_user_by_email(email);
+    std::cout << "Successfully extracted Yandex email: " << email << std::endl;
+
+    auto user_opt = mongo_db->find_user(email);
     
     std::vector<std::string> roles;
     
@@ -82,7 +86,7 @@ void handle_yandex_callback(
         std::string username = "Аноним" + std::to_string(dis(gen));
         
         mongo_db->create_user(email, username);
-        roles = {"Student"};
+        roles = {"Студент"};
     } else {
         User user = *user_opt;
         roles = user.roles;
@@ -95,9 +99,13 @@ void handle_yandex_callback(
     std::string jwt_access_token = jwt_handler->generate_access_token(permissions);
     std::string jwt_refresh_token = jwt_handler->generate_refresh_token(email);
 
-    mongo_db->add_refresh_token(email, jwt_refresh_token);
+    std::cout << "Generated JWT tokens for " << email << " - access_token: " << jwt_access_token.substr(0, 20) 
+        << "..." << " - refresh_token: " << jwt_refresh_token.substr(0, 20) << "..." << std::endl;
+
+    mongo_db->add_tokens(email, jwt_access_token, jwt_refresh_token);
 
     storage.update_session_status(state, AuthStatus::GRANTED, jwt_access_token, jwt_refresh_token);
     
+    std::cout << "Yandex auth successful for email: " << email << std::endl;
     res.set_content("<h1>Успешная авторизация!</h1><p>Вы успешно авторизовались через Яндекс.</p><p>Закройте это окно и вернитесь в приложение.</p>", "text/html; charset=utf-8");
 }

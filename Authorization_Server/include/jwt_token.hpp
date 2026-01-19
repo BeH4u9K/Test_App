@@ -121,10 +121,8 @@ private:
     }
 
     std::string hmac_sha256(const std::string& data) const {
-        unsigned char* digest = HMAC(EVP_sha256(), 
-                     secret_key_.c_str(), secret_key_.length(),
-                     (unsigned char*)data.c_str(), data.length(),
-                     NULL, NULL);
+        unsigned char* digest = HMAC(EVP_sha256(), secret_key_.c_str(), secret_key_.length(),
+            (unsigned char*)data.c_str(), data.length(), NULL, NULL);
         
         std::stringstream ss;
         for(int i = 0; i < 32; i++) {

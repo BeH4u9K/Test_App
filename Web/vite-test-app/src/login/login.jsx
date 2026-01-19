@@ -395,14 +395,14 @@ function Login({ type, hasExistingSession = false, authState = null }) {
                 );
                 
                 if (saveResult.success) {
-                  setStatus('✅ Авторизация успешна! Перенаправление...');
+                  setStatus(' Авторизация успешна! Перенаправление...');
                   
                   setTimeout(() => {
                     const redirectUrl = `/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&user_id=${encodeURIComponent(tokens.userId)}&provider=${encodeURIComponent(tokens.provider)}&login_token=${encodeURIComponent(loginTokenForCheck)}`;
                     navigate(redirectUrl);
                   }, 1000);
                 } else {
-                  setStatus('❌ Ошибка сохранения токенов');
+                  setStatus(' Ошибка сохранения токенов');
                   setLoading(false);
                 }
                 
@@ -411,23 +411,23 @@ function Login({ type, hasExistingSession = false, authState = null }) {
                 
                 if (attempts >= maxAttempts) {
                   clearInterval(pollInterval);
-                  setStatus('❌ Время ожидания истекло');
+                  setStatus(' Время ожидания истекло');
                   setLoading(false);
                 }
               } else if (tokens.status === 'denied' || tokens.status === 'expired') {
                 clearInterval(pollInterval);
-                setStatus(`❌ Авторизация отклонена: ${tokens.status}`);
+                setStatus(` Авторизация отклонена: ${tokens.status}`);
                 setLoading(false);
               } else if (tokens.status === 'error') {
                 clearInterval(pollInterval);
-                setStatus(`❌ Ошибка: ${tokens.error}`);
+                setStatus(` Ошибка: ${tokens.error}`);
                 setLoading(false);
               }
             }, 2000);
           }
           
         } catch (error) {
-          setStatus(`❌ Ошибка: ${error.message}`);
+          setStatus(` Ошибка: ${error.message}`);
           setLoading(false);
         }
       }
@@ -523,20 +523,20 @@ function Login({ type, hasExistingSession = false, authState = null }) {
                     );
                     
                     if (saveResult.success) {
-                      setStatus('✅ Авторизация успешна! Перенаправление...');
+                      setStatus(' Авторизация успешна! Перенаправление...');
                       
                       setTimeout(() => {
                         const redirectUrl = `/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&user_id=${encodeURIComponent(userId)}&provider=${encodeURIComponent(provider)}&login_token=${encodeURIComponent(generatedLoginToken)}`;
                         navigate(redirectUrl);
                       }, 1000);
                     } else {
-                      setStatus('❌ Ошибка сохранения токенов');
+                      setStatus(' Ошибка сохранения токенов');
                       setLoading(false);
                       hasStartedRef.current = false;
                     }
                     
                   } else {
-                    setStatus('❌ Авторизация не завершена. Попробуйте снова.');
+                    setStatus(' Авторизация не завершена. Попробуйте снова.');
                     setLoading(false);
                     hasStartedRef.current = false;
                   }
@@ -574,21 +574,21 @@ function Login({ type, hasExistingSession = false, authState = null }) {
             );
             
             if (saveResult.success) {
-              setStatus('✅ Авторизация успешна! Перенаправление...');
+              setStatus(' Авторизация успешна! Перенаправление...');
               
               setTimeout(() => {
                 const redirectUrl = `/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&user_id=${encodeURIComponent(userId)}&provider=${encodeURIComponent(provider)}&login_token=${encodeURIComponent(generatedLoginToken)}`;
                 navigate(redirectUrl);
               }, 1000);
             } else {
-              setStatus('❌ Ошибка сохранения токенов');
+              setStatus(' Ошибка сохранения токенов');
               setLoading(false);
               hasStartedRef.current = false;
             }
             
           } else if (attempts >= maxAttempts) {
             clearInterval(pollInterval);
-            setStatus('❌ Время ожидания истекло');
+            setStatus(' Время ожидания истекло');
             setLoading(false);
             hasStartedRef.current = false;
           }
@@ -599,7 +599,7 @@ function Login({ type, hasExistingSession = false, authState = null }) {
       }
       
     } catch (error) {
-      setStatus(`❌ Ошибка: ${error.message}`);
+      setStatus(` Ошибка: ${error.message}`);
       
       setTimeout(() => {
         hasStartedRef.current = false;

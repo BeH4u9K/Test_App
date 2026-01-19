@@ -909,7 +909,7 @@ app.get('/api/user/generate-id', async (req, res) => {
   }
 });
 
-// Добавьте в бэкенд
+
 app.post('/api/user/delete/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -923,18 +923,18 @@ app.post('/api/user/delete/:userId', async (req, res) => {
     
     const userKey = `user:${userId}`;
     
-    // Удаляем пользователя
+ 
     const deleted = await redisClient.del(userKey);
     
-    // Ищем и удаляем все его сессии
+    
     const allSessionKeys = await redisClient.keys('session:*');
     let deletedSessions = 0;
     
     for (const sessionKey of allSessionKeys) {
       const loginToken = await redisClient.get(sessionKey);
-      // Если нужно, можно добавить дополнительную логику поиска
+      
       if (loginToken) {
-        // Просто удаляем все сессии для безопасности
+        
         await redisClient.del(sessionKey);
         deletedSessions++;
       }

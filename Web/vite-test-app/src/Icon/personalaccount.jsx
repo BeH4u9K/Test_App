@@ -155,7 +155,7 @@ const menuItems = [
   { text: 'Участники' },
 ];
 
-// Доступные роли в системе
+
 const AVAILABLE_ROLES = [
   { value: 'admin', label: 'Администратор', icon: <AdminPanelSettingsIcon />, color: 'error' },
   { value: 'teacher', label: 'Преподаватель', icon: <SchoolOutlinedIcon />, color: 'warning' },
@@ -176,7 +176,7 @@ function PersonalAccount() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // Состояния для модального окна просмотра пользователя
+
   const [openUserDialog, setOpenUserDialog] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedUserInfo, setSelectedUserInfo] = useState(null);
@@ -186,7 +186,7 @@ function PersonalAccount() {
   const [testAnswerOptions, setTestAnswerOptions] = useState([]);
 
 
-  // Диалог редактирования ФИО
+
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editUserData, setEditUserData] = useState({
     id: '',
@@ -195,7 +195,7 @@ function PersonalAccount() {
   });
   const [saveLoading, setSaveLoading] = useState(false);
   
-  // Диалог редактирования ролей
+
   const [openRolesDialog, setOpenRolesDialog] = useState(false);
   const [editRolesData, setEditRolesData] = useState({
     id: '',
@@ -204,7 +204,7 @@ function PersonalAccount() {
   });
   const [rolesLoading, setRolesLoading] = useState(false);
   
-  // Диалог блокировки пользователя
+
   const [openBlockDialog, setOpenBlockDialog] = useState(false);
   const [blockUserData, setBlockUserData] = useState({
     id: '',
@@ -215,7 +215,7 @@ function PersonalAccount() {
   const [blockLoading, setBlockLoading] = useState(false);
   const [blockStatuses, setBlockStatuses] = useState({});
   
-  // Академическая информация пользователя
+
   const [academicTab, setAcademicTab] = useState(0);
   const [userDisciplines, setUserDisciplines] = useState([]);
   const [userTests, setUserTests] = useState([]);
@@ -224,7 +224,7 @@ function PersonalAccount() {
   const [academicLoading, setAcademicLoading] = useState(false);
   const [academicError, setAcademicError] = useState('');
 
-  // Состояния для работы с дисциплинами
+
   const [disciplineDialog, setDisciplineDialog] = useState({
     open: false,
     mode: 'view',
@@ -233,7 +233,7 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояния для списка тестов дисциплины
+
   const [disciplineTestsDialog, setDisciplineTestsDialog] = useState({
     open: false,
     disciplineId: null,
@@ -243,7 +243,6 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояние для проверки активности теста
   const [testStateDialog, setTestStateDialog] = useState({
     open: false,
     disciplineId: null,
@@ -255,7 +254,7 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояние для просмотра результатов попытки
+
 const [viewAttemptDialog, setViewAttemptDialog] = useState({
   open: false,
   attemptId: null,
@@ -270,7 +269,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
   error: ''
 });
 
-  // Состояние для активации/деактивации теста
+
   const [activateTestDialog, setActivateTestDialog] = useState({
     open: false,
     disciplineId: null,
@@ -283,7 +282,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Состояние для добавления нового теста
+
   const [addTestDialog, setAddTestDialog] = useState({
     open: false,
     disciplineId: null,
@@ -294,7 +293,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Состояние для удаления теста
+
   const [deleteTestDialog, setDeleteTestDialog] = useState({
     open: false,
     disciplineId: null,
@@ -305,7 +304,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Новые состояния для студентов дисциплины
+
   const [disciplineStudentsDialog, setDisciplineStudentsDialog] = useState({
     open: false,
     disciplineId: null,
@@ -323,22 +322,20 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     }
   });
 
-  // Меню действий для теста
   const [testMenuAnchor, setTestMenuAnchor] = useState(null);
   const [selectedTestForMenu, setSelectedTestForMenu] = useState(null);
   const [selectedDisciplineForMenu, setSelectedDisciplineForMenu] = useState(null);
 
-  // Детальная информация о дисциплине
+
   const [disciplineDetail, setDisciplineDetail] = useState(null);
 
-  // Уведомления
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success',
   });
 
-  // Состояние для удаления дисциплины
+
   const [deleteDisciplineDialog, setDeleteDisciplineDialog] = useState({
     open: false,
     disciplineId: null,
@@ -347,7 +344,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Состояние для восстановления дисциплины
+ 
   const [restoreDisciplineDialog, setRestoreDisciplineDialog] = useState({
     open: false,
     disciplineId: null,
@@ -356,15 +353,14 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Флаг для показа удаленных дисциплин
+
   const [showDeleted, setShowDeleted] = useState(false);
 
-  // Меню действий для дисциплины
+  
   const [disciplineMenuAnchor, setDisciplineMenuAnchor] = useState(null);
   const [selectedDisciplineForAction, setSelectedDisciplineForAction] = useState(null);
 
-  // ============= НОВЫЕ СОСТОЯНИЯ ДЛЯ СПИСКА ВОПРОСОВ =============
-  // Состояние для списка вопросов теста
+
   const [questionsDialog, setQuestionsDialog] = useState({
     open: false,
     testId: null,
@@ -375,8 +371,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // ============= НОВЫЕ СОСТОЯНИЯ ДЛЯ РЕДАКТИРОВАНИЯ И СОЗДАНИЯ ВОПРОСОВ =============
-  // Состояние для создания нового вопроса
+
   const [createQuestionDialog, setCreateQuestionDialog] = useState({
     open: false,
     testId: null,
@@ -389,7 +384,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Состояние для редактирования вопроса
+
   const [editQuestionDialog, setEditQuestionDialog] = useState({
     open: false,
     questionId: null,
@@ -406,7 +401,7 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Состояние для удаления вопроса
+
   const [deleteQuestionDialog, setDeleteQuestionDialog] = useState({
     open: false,
     questionId: null,
@@ -415,25 +410,24 @@ const [viewAttemptDialog, setViewAttemptDialog] = useState({
     error: ''
   });
 
-  // Меню действий для вопроса
+
   const [questionMenuAnchor, setQuestionMenuAnchor] = useState(null);
   const [selectedQuestionForMenu, setSelectedQuestionForMenu] = useState(null);
 
-  // ============= НОВЫЕ СОСТОЯНИЯ ДЛЯ ДОБАВЛЕНИЯ ВОПРОСА В ТЕСТ =============
-  // Состояние для добавления существующего вопроса в тест
+
   const [addQuestionToTestDialog, setAddQuestionToTestDialog] = useState({
     open: false,
     testId: null,
     testName: '',
     disciplineId: null,
     disciplineName: '',
-    allQuestions: [], // Все доступные вопросы
+    allQuestions: [], 
     selectedQuestionId: '',
     loading: false,
     error: ''
   });
 
-  // Состояние для изменения порядка вопросов
+
 const [reorderQuestionsDialog, setReorderQuestionsDialog] = useState({
   open: false,
   testId: null,
@@ -446,7 +440,7 @@ const [reorderQuestionsDialog, setReorderQuestionsDialog] = useState({
 });
 
 
-// Состояние для drag & drop
+
 const [draggedQuestion, setDraggedQuestion] = useState(null);
 
 useEffect(() => {
@@ -462,8 +456,8 @@ useEffect(() => {
         throw new Error(err.message || `HTTP ${res.status}`);
       }
 
-      const data = await res.json();     // ожидается { id: 5 }
-      setUserId(String(data.id));        // как и раньше
+      const data = await res.json();     
+      setUserId(String(data.id));        
     } catch (e) {
       console.error('getMaxId error', e);
       showSnackbar(e.message, 'error');
@@ -475,7 +469,6 @@ useEffect(() => {
 
 const [userId, setUserId] = useState(null);
 
-  // ============= ФУНКЦИИ ДЛЯ УВЕДОМЛЕНИЙ =============
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({
       open: true,
@@ -488,13 +481,13 @@ const [userId, setUserId] = useState(null);
     setSnackbar({ ...snackbar, open: false });
   };
 
-// Добавьте в состояние startTestDialog поле для attempt_id
+
 const [startTestDialog, setStartTestDialog] = useState({
   open: false,
   testId: null,
   testName: '',
   disciplineName: '',
-  attemptId: null, // Добавьте это поле
+  attemptId: null, 
   questions: [],
   currentQuestionIndex: 0,
   userAnswers: {},
@@ -502,9 +495,7 @@ const [startTestDialog, setStartTestDialog] = useState({
   error: ''
 });
 
-  // ============= ОСНОВНЫЕ ФУНКЦИИ ЗАГРУЗКИ =============
 
-  // Запись пользователя на дисциплину по точному API /disciplines/{disciplineID}/students/{userID}
 const addStudentToDisciplineExact = async (disciplineId, userId) => {
   try {
     setDisciplineStudentsDialog(prev => ({
@@ -525,14 +516,14 @@ const addStudentToDisciplineExact = async (disciplineId, userId) => {
     }
 
     const data = await response.json();
-    console.log('✅ Добавлен студент:', data);
+    console.log('Добавлен студент:', data);
 
-    // Перезагружаем список студентов
+
     await fetchDisciplineStudents(disciplineId);
     showSnackbar('Студент записан на дисциплину!', 'success');
     
   } catch (err) {
-    console.error('❌ Ошибка записи:', err);
+    console.error(' Ошибка записи:', err);
     setDisciplineStudentsDialog(prev => ({
       ...prev,
       addStudentDialog: { ...prev.addStudentDialog, error: err.message }
@@ -542,7 +533,7 @@ const addStudentToDisciplineExact = async (disciplineId, userId) => {
 };
 
 
-  // Функция для инициализации теста (начало попытки)
+
 const initializeTest = async (userId, testId) => {
   try {
     const response = await fetch(`${API_BASE_URL}/users/${userId}/attempts`, {
@@ -559,7 +550,6 @@ const initializeTest = async (userId, testId) => {
     
     const data = await response.json();
     
-    // Добавьте детальный лог для понимания структуры
     console.log('Полный ответ от сервера при начале теста:', data);
     
     if (data.questions && Array.isArray(data.questions)) {
@@ -578,7 +568,7 @@ const initializeTest = async (userId, testId) => {
   }
 };
 
-  // Загрузка профиля текущего пользователя
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -597,7 +587,7 @@ const initializeTest = async (userId, testId) => {
         const userData = await userResponse.json();
         console.log('Данные пользователя:', userData);
         
-        // Проверяем статус блокировки
+       
         let isBlocked = false;
         if (blockResponse.ok) {
           const blockData = await blockResponse.json();
@@ -607,7 +597,7 @@ const initializeTest = async (userId, testId) => {
         setUserName(userData.user_name || userData.full_name || userData.name || 'Неизвестный пользователь');
         setUserEmail(userData.email || userData.mail || 'Не указана');
         
-        // Загружаем роли пользователя
+       
         try {
           const rolesResponse = await fetch(`${API_BASE_URL}/users/${userId}/roles`);
           if (rolesResponse.ok) {
@@ -621,7 +611,7 @@ const initializeTest = async (userId, testId) => {
           setUserRoles([]);
         }
         
-        // Сохраняем статус блокировки
+       
         setBlockStatuses(prev => ({
           ...prev,
           [userId]: isBlocked
@@ -641,7 +631,7 @@ const initializeTest = async (userId, testId) => {
     }
   }, [activeTab, userId]);
 
-  // Загрузка списка всех дисциплин
+ 
   const fetchDisciplines = async () => {
     try {
       setDisciplinesLoading(true);
@@ -782,9 +772,7 @@ const initializeTest = async (userId, testId) => {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ ДИСЦИПЛИН =============
-
-  // 1. Получить детальную информацию о дисциплине
+  
   const fetchDisciplineDetail = async (disciplineId) => {
     try {
       setDisciplineDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -864,7 +852,7 @@ const initializeTest = async (userId, testId) => {
     }
   };
 
-  // 3. Получить список тестов дисциплины
+  
   const fetchDisciplineTests = async (disciplineId) => {
     try {
       setDisciplineTestsDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -904,7 +892,7 @@ const initializeTest = async (userId, testId) => {
   const payload = {
     name: disciplineData.name?.trim(),
     description: disciplineData.description?.trim(),
-    teacher_id: Number(userId), // гарантированно number
+    teacher_id: Number(userId), 
   };
 
   const response = await fetch(`${API_BASE_URL}/disciplines`, {
@@ -920,7 +908,7 @@ const initializeTest = async (userId, testId) => {
       
       const data = await response.json();
       
-      // Обновляем список дисциплин
+      
       fetchDisciplines();
       
       showSnackbar('Дисциплина успешно создана!', 'success');
@@ -936,7 +924,7 @@ const initializeTest = async (userId, testId) => {
     }
   };
 
-  // 5. Проверить активность теста
+
   const fetchTestState = async (disciplineId, testId) => {
     try {
       setTestStateDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -980,7 +968,7 @@ const updateTestState = async (disciplineId, testId, active) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        is_active: active  // ИЗМЕНЕНО: было "active", стало "is_active"
+        is_active: active  
       }),
     });
     
@@ -991,7 +979,7 @@ const updateTestState = async (disciplineId, testId, active) => {
     
     const data = await response.json();
     
-    // Обновляем список тестов в диалоге
+  
     if (disciplineTestsDialog.disciplineId === disciplineId) {
       fetchDisciplineTests(disciplineId);
     }
@@ -1009,7 +997,7 @@ const updateTestState = async (disciplineId, testId, active) => {
   }
 };
 
-  // 7. Добавить новый тест в дисциплину
+  
   const addTestToDiscipline = async (disciplineId, testData) => {
     try {
       setAddTestDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -1029,7 +1017,7 @@ const updateTestState = async (disciplineId, testId, active) => {
       
       const data = await response.json();
       
-      // Обновляем список тестов в диалоге
+      
       if (disciplineTestsDialog.disciplineId === disciplineId) {
         fetchDisciplineTests(disciplineId);
       }
@@ -1047,7 +1035,7 @@ const updateTestState = async (disciplineId, testId, active) => {
     }
   };
 
-  // 8. Удалить тест из дисциплины
+
   const deleteTestFromDiscipline = async (disciplineId, testId) => {
     try {
       setDeleteTestDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -1063,7 +1051,7 @@ const updateTestState = async (disciplineId, testId, active) => {
       
       const data = await response.json();
       
-      // Обновляем список тестов в диалоге
+
       if (disciplineTestsDialog.disciplineId === disciplineId) {
         fetchDisciplineTests(disciplineId);
       }
@@ -1081,9 +1069,7 @@ const updateTestState = async (disciplineId, testId, active) => {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ СТУДЕНТОВ ДИСЦИПЛИНЫ =============
 
-  // 9. Получить список студентов дисциплины
   const fetchDisciplineStudents = async (disciplineId) => {
     try {
       setDisciplineStudentsDialog(prev => ({ 
@@ -1102,15 +1088,14 @@ const updateTestState = async (disciplineId, testId, active) => {
       const data = await response.json();
       console.log('Ответ от /students:', data);
       
-      // Проверьте формат данных
+     
       if (!Array.isArray(data)) {
         console.error('Ответ не является массивом:', typeof data, data);
         throw new Error('Некорректный формат данных студентов');
       }
       
-      // Если данные уже содержат информацию о студентах
+      
       if (data.length > 0 && typeof data[0] === 'object' && data[0].id) {
-        // Формат: [{id: 1, name: "Иван", email: "ivan@example.com"}, ...]
         const studentsWithDetails = data.map(student => ({
           id: student.id,
           name: student.full_name || student.name || student.user_name || 'Неизвестный',
@@ -1126,9 +1111,9 @@ const updateTestState = async (disciplineId, testId, active) => {
         return studentsWithDetails;
       }
       
-      // Если данные содержат только ID студентов
+      
       if (data.length > 0 && typeof data[0] === 'number' || typeof data[0] === 'string') {
-        // Формат: [1, 2, 3] или ["1", "2", "3"]
+        
         const studentsWithDetails = await Promise.all(
           data.map(async (studentId) => {
             try {
@@ -1212,7 +1197,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
 
 
 
-  // 11. Отчислить пользователя с дисциплины
+ 
   const removeStudentFromDiscipline = async (disciplineId, studentId) => {
     try {
       const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/students/${studentId}`, {
@@ -1224,7 +1209,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
       
-      // Обновляем список студентов
+      
       await fetchDisciplineStudents(disciplineId);
       
       showSnackbar('Пользователь успешно отчислен с дисциплины!', 'success');
@@ -1237,7 +1222,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
     }
   };
 
-  // 12. Загрузить список всех пользователей для выбора
+  
   const fetchAllUsersForSelection = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/users`);
@@ -1249,7 +1234,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
       const data = await response.json();
       const usersArray = Array.isArray(data) ? data : [];
       
-      // Фильтруем только студентов (можно добавить дополнительную логику фильтрации)
+     
       const filteredUsers = usersArray.filter(user => 
         !user.roles || 
         user.roles.includes('student') || 
@@ -1274,9 +1259,6 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ МЯГКОГО УДАЛЕНИЯ ДИСЦИПЛИНЫ =============
-
-  // 13. Отметить дисциплину как удаленную (мягкое удаление)
   const deleteDiscipline = async (disciplineId) => {
     try {
       setDeleteDisciplineDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -1292,12 +1274,12 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
       
       const data = await response.json();
       
-      // Обновляем список дисциплин
+
       setDisciplines(prev => 
         prev.map(d => d.id === disciplineId ? { ...d, deleted: true } : d)
       );
       
-      // Закрываем все открытые диалоги для этой дисциплины
+     
       if (disciplineDialog.data?.id === disciplineId) {
         handleCloseDisciplineDialog();
       }
@@ -1331,7 +1313,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
       
       const data = await response.json();
       
-      // Обновляем список дисциплин
+      
       setDisciplines(prev => 
         prev.map(d => d.id === disciplineId ? { ...d, deleted: false } : d)
       );
@@ -1349,9 +1331,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ РЕДАКТИРОВАНИЯ ПОЛЬЗОВАТЕЛЕЙ =============
 
-  // Изменение ФИО пользователя
   const updateUserName = async (userId, newName) => {
     try {
       setSaveLoading(true);
@@ -1374,7 +1354,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
       const result = await response.json();
       showSnackbar('ФИО успешно изменено!', 'success');
       
-      // Обновить данные в UI
+      
       if (selectedUserInfo?.id === userId) {
         setSelectedUserInfo({
           ...selectedUserInfo,
@@ -1430,7 +1410,7 @@ const addStudentToDiscipline = async (disciplineId, studentId) => {
       const result = await response.json();
       showSnackbar('Роли успешно обновлены!', 'success');
       
-      // Обновить данные в UI
+      
       if (selectedUserInfo?.id === userId) {
         setSelectedUserInfo({
           ...selectedUserInfo,
@@ -1481,14 +1461,12 @@ const updateUserBlockStatus = async (userId, blocked, reason) => {
   return await response.json();
 };
 
-  // ============= ФУНКЦИИ ДЛЯ ЗАГРУЗКИ СПИСКА ВОПРОСОВ =============
 
-  // Получить список вопросов теста (с фильтрацией последней версии)
   const fetchTestQuestions = async (disciplineId, testId) => {
     try {
       setQuestionsDialog(prev => ({ ...prev, loading: true, error: '' }));
       
-      // Измененный URL: http://localhost:8081/api/v1/disciplines/1/tests/1/questions
+      
       const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/questions`);
       
       if (!response.ok) {
@@ -1497,7 +1475,7 @@ const updateUserBlockStatus = async (userId, blocked, reason) => {
       
       const allQuestions = await response.json();
       
-      // Фильтруем вопросы, оставляя только последние версии
+      
       const filteredQuestions = filterLatestQuestionVersions(allQuestions);
       
       setQuestionsDialog(prev => ({
@@ -1548,23 +1526,21 @@ const updateUserBlockStatus = async (userId, blocked, reason) => {
       });
     });
     
-    // Для каждой группы оставляем только последнюю версию
+   
     const result = [];
     
     Object.values(questionGroups).forEach(group => {
       if (group.length > 0) {
-        // Сортируем по версии в порядке убывания
+        
         const sortedGroup = [...group].sort((a, b) => b.version - a.version);
-        result.push(sortedGroup[0]); // Берем первый элемент (самая новая версия)
+        result.push(sortedGroup[0]); 
       }
     });
     
     return result;
   };
 
-  // ============= НОВЫЕ ФУНКЦИИ ДЛЯ РАБОТЫ С ВОПРОСАМИ =============
 
-    // Функция для загрузки результатов попытки теста
 const fetchAttemptResults = async (userId, attemptId) => {
   try {
     setViewAttemptDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -1577,7 +1553,7 @@ const fetchAttemptResults = async (userId, attemptId) => {
     
     const data = await response.json();
     
-    // Преобразуем данные в удобный формат
+
     const formattedQuestions = data.answers?.map((answer, index) => ({
       id: index,
       question_text: answer.question_text || `Вопрос ${index + 1}`,
@@ -1660,13 +1636,13 @@ const updateQuestion = async (questionId, questionData) => {
   try {
     setEditQuestionDialog(prev => ({ ...prev, loading: true, error: '' }));
     
-    // Формируем данные для обновления
+
     const requestData = {
       title: questionData.title,
       question_text: questionData.questionText,
-      answers: questionData.answers.filter(answer => answer.trim() !== ''), // Убираем пустые ответы
+      answers: questionData.answers.filter(answer => answer.trim() !== ''), 
       correct_answer: questionData.correctAnswerIndex,
-      version: questionData.currentVersion + 1 // Увеличиваем версию
+      version: questionData.currentVersion + 1 
     };
     
     const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
@@ -1686,7 +1662,7 @@ const updateQuestion = async (questionId, questionData) => {
     
     // Обновляем список вопросов в диалоге
     if (questionsDialog.testId) {
-      // Перезагружаем вопросы
+      
       const disciplineId = questionsDialog.disciplineId;
       if (disciplineId) {
         await fetchTestQuestions(disciplineId, questionsDialog.testId);
@@ -1722,9 +1698,9 @@ const updateQuestion = async (questionId, questionData) => {
       
       const data = await response.json();
       
-      // Обновляем список вопросов в диалоге
+     
       if (questionsDialog.testId) {
-        // Перезагружаем вопросы
+       
         const disciplineId = questionsDialog.disciplineId;
         if (disciplineId) {
           await fetchTestQuestions(disciplineId, questionsDialog.testId);
@@ -1744,7 +1720,7 @@ const updateQuestion = async (questionId, questionData) => {
     }
   };
 
-  // ============= НОВЫЕ ФУНКЦИИ ДЛЯ ДОБАВЛЕНИЯ ВОПРОСА В ТЕСТ =============
+  
 
   // 18. Проверить, есть ли попытки прохождения теста
   const checkTestAttempts = async (testId) => {
@@ -1752,9 +1728,9 @@ const updateQuestion = async (questionId, questionData) => {
       const response = await fetch(`${API_BASE_URL}/tests/${testId}/attempts`);
       
       if (!response.ok) {
-        // Если тест не имеет попыток, API может вернуть ошибку или пустой массив
+        
         if (response.status === 404) {
-          return []; // Нет попыток
+          return []; 
         }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -1764,15 +1740,15 @@ const updateQuestion = async (questionId, questionData) => {
       
     } catch (err) {
       console.error('Ошибка проверки попыток теста:', err);
-      // Если возникает ошибка, предполагаем что попыток нет
+      
       return [];
     }
   };
 
-  // 19. Получить список всех доступных вопросов
+  
   const fetchAllQuestions = async () => {
     try {
-      // Запрашиваем все вопросы из системы
+      
       const response = await fetch(`${API_BASE_URL}/questions`);
       
       if (!response.ok) {
@@ -1823,7 +1799,7 @@ const updateQuestion = async (questionId, questionData) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          position: -1 // -1 означает добавить в конец
+          position: -1 
         }),
       });
       
@@ -1860,9 +1836,9 @@ const updateQuestion = async (questionId, questionData) => {
     const response = await fetch(`${API_BASE_URL}/tests/${testId}/attempts`);
     
     if (!response.ok) {
-      // Если тест не имеет попыток, API может вернуть ошибку или пустой массив
+     
       if (response.status === 404) {
-        return []; // Нет попыток
+        return []; 
       }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
@@ -1872,7 +1848,7 @@ const updateQuestion = async (questionId, questionData) => {
     
   } catch (err) {
     console.error('Ошибка проверки попыток теста для изменения порядка:', err);
-    // Если возникает ошибка, предполагаем что попыток нет
+    
     return [];
   }
 };
@@ -1882,7 +1858,7 @@ const reorderTestQuestions = async (testId, questionOrder) => {
   try {
     setReorderQuestionsDialog(prev => ({ ...prev, loading: true, error: '' }));
     
-    // Проверяем, есть ли попытки прохождения теста
+   
     const attempts = await checkTestAttemptsForReorder(testId);
     
     if (attempts.length > 0) {
@@ -1930,7 +1906,7 @@ const reorderTestQuestions = async (testId, questionOrder) => {
 };
 
 
-// 23. Получить список пользователей, прошедших тест
+
 const fetchTestUsers = async (testId) => {
   try {
     setTestUsersDialog(prev => ({ ...prev, loading: true, error: '', users: [] }));
@@ -1949,7 +1925,7 @@ const fetchTestUsers = async (testId) => {
       return [];
     }
     
-    // Группируем попытки по пользователям
+   
     const userAttemptsMap = {};
     
     attempts.forEach(attempt => {
@@ -2039,8 +2015,7 @@ const fetchUserAttemptAnswers = async (attemptId) => {
   try {
     setUserAttemptDialog(prev => ({ ...prev, loading: true, error: '', answers: [] }));
     
-    // Предполагаем, что API возвращает ответы пользователя
-    // Если API не поддерживает эту функцию, нужно адаптировать
+    
     const response = await fetch(`${API_BASE_URL}/attempts/${attemptId}/answers`);
     
     if (!response.ok) {
@@ -2074,10 +2049,10 @@ const fetchUserAttemptAnswers = async (attemptId) => {
   }
 };
 
-// Функция для завершения теста (отправки ответов)
+
 const completeTestAttempt = async (userId, attemptId, answers) => {
   try {
-    // URL: http://localhost:8081/api/v1/users/{userID}/attempts/{attemptID}
+    
     const response = await fetch(`${API_BASE_URL}/users/${userId}/attempts/${attemptId}`, {
       method: 'PUT',
       headers: {
@@ -2101,23 +2076,11 @@ const completeTestAttempt = async (userId, attemptId, answers) => {
   }
 };
 
-// Вспомогательная функция для генерации тестовых данных (если API не готово)
-// 
 
-// 25. Проверить, является ли пользователь преподавателем на курсе
 const checkIsTeacherOnCourse = async (userId, disciplineId) => {
   try {
-    // Здесь должна быть логика проверки роли преподавателя
-    // Для демонстрации считаем, что текущий пользователь - преподаватель
-    return true;
     
-    // Реальная реализация:
-    // const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/teachers`);
-    // if (response.ok) {
-    //   const teachers = await response.json();
-    //   return teachers.includes(parseInt(userId));
-    // }
-    // return false;
+    return true;
   } catch (err) {
     console.error('Ошибка проверки роли преподавателя:', err);
     return false;
@@ -2300,7 +2263,7 @@ const handleCloseReorderQuestionsDialog = () => {
   setDraggedQuestion(null);
 };
 
-// Обработчики для drag & drop
+
 const handleDragStart = (event, question, index) => {
   setDraggedQuestion({ question, index });
   event.dataTransfer.effectAllowed = 'move';
@@ -2319,16 +2282,14 @@ const handleDrop = (event, targetIndex) => {
   const sourceIndex = draggedQuestion.index;
   if (sourceIndex === targetIndex) return;
   
-  // Создаем новый массив вопросов
+
   const newQuestions = [...reorderQuestionsDialog.questions];
   
-  // Удаляем элемент из старой позиции
+
   const [removed] = newQuestions.splice(sourceIndex, 1);
-  
-  // Вставляем элемент в новую позицию
+
   newQuestions.splice(targetIndex, 0, removed);
-  
-  // Обновляем состояние
+
   setReorderQuestionsDialog(prev => ({
     ...prev,
     questions: newQuestions
@@ -2575,9 +2536,8 @@ const handleAddStudentToDiscipline = async () => {
     });
   };
 
-  // Обработчик для редактирования вопроса
+
   const handleEditQuestionClick = (question) => {
-    // Получаем данные вопроса из rawQuestion
     const rawQuestion = question.rawQuestion;
     
     setEditQuestionDialog({
@@ -2609,9 +2569,7 @@ const handleAddStudentToDiscipline = async () => {
   };
   
 
-  // ============= НОВЫЕ ОБРАБОТЧИКИ ДЛЯ ДОБАВЛЕНИЯ ВОПРОСА В ТЕСТ =============
 
-  // Обработчик для открытия диалога добавления вопроса в тест
   const handleAddQuestionToTestClick = () => {
     setAddQuestionToTestDialog({
       open: true,
@@ -2625,7 +2583,7 @@ const handleAddStudentToDiscipline = async () => {
       error: ''
     });
 
-    // Состояние для редактирования вопроса
+  
 const [editQuestionDialog, setEditQuestionDialog] = useState({
   open: false,
   questionId: null,
@@ -2656,7 +2614,7 @@ const [testUsersDialog, setTestUsersDialog] = useState({
   testName: '',
   disciplineId: null,
   disciplineName: '',
-  users: [], // {id, name, attempts: [{id, started_at, completed_at, score}]}
+  users: [], 
   loading: false,
   error: ''
 });
@@ -2708,8 +2666,7 @@ const handleStartTestClick = async (test, disciplineName = '', disciplineId = nu
   });
   
   try {
-    // 1. Инициализируем тест - получаем attempt_id и вопросы
-    // Передаем оба параметра: userId и testId
+
     const testData = await initializeTest(userId, test.id);
     
     // 2. Проверяем структуру данных
@@ -2834,8 +2791,6 @@ const handleCloseTestMarksDialog = () => {
 
 
 // Обработчик для завершения теста
-// Обработчик для завершения теста
-// Обработчик для завершения теста
 const handleSubmitTest = async () => {
   try {
     setStartTestDialog(prev => ({ ...prev, loading: true }));
@@ -2844,7 +2799,7 @@ const handleSubmitTest = async () => {
       throw new Error('Не удалось определить ID попытки теста');
     }
     
-    // Проверяем, все ли вопросы ответили
+    
     const unansweredQuestions = startTestDialog.questions.filter((_, index) => 
       startTestDialog.userAnswers[index] === undefined
     );
@@ -2866,7 +2821,7 @@ const handleSubmitTest = async () => {
       
       return {
         question_id: question.id,
-        answer_option_id: selectedOption.id // Используем реальный ID варианта ответа
+        answer_option_id: selectedOption.id 
       };
     });
     
@@ -3261,7 +3216,6 @@ const handlePreviousQuestion = () => {
       });
       handleCloseAddTestDialog();
     } catch (err) {
-      // Ошибка уже обработана
     }
   };
 
@@ -3274,7 +3228,7 @@ const handlePreviousQuestion = () => {
       );
       handleCloseDeleteTestDialog();
     } catch (err) {
-      // Ошибка уже обработана
+    
     }
   };
 
@@ -3291,9 +3245,7 @@ const handlePreviousQuestion = () => {
     });
   };
 
-  // ============= НОВЫЕ ОБРАБОТЧИКИ ДЛЯ ЗАКРЫТИЯ ДИАЛОГОВ ВОПРОСОВ =============
 
-  // Закрытие диалога создания вопроса
   const handleCloseCreateQuestionDialog = () => {
     setCreateQuestionDialog({
       open: false,
@@ -3338,7 +3290,6 @@ const handlePreviousQuestion = () => {
     });
   };
 
-  // ============= НОВЫЕ ОБРАБОТЧИКИ ДЛЯ ЗАКРЫТИЯ ДИАЛОГА ДОБАВЛЕНИЯ ВОПРОСА В ТЕСТ =============
 
   // Закрытие диалога добавления вопроса в тест
   const handleCloseAddQuestionToTestDialog = () => {
@@ -3621,11 +3572,11 @@ const handlePreviousQuestion = () => {
     
 try {
     await updateUserRoles(editRolesData.id, editRolesData.newRoles);
-    if (editRolesData.id === userId) {  // userId === 1
-      await fetchUserProfile();  // Перезагружает роли
+    if (editRolesData.id === userId) { 
+      await fetchUserProfile();  
     }
     handleCloseRolesDialog();
-  } catch (err) { /* ... */ }
+  } catch (err) { }
 };
 
   const handleConfirmBlock = async () => {
@@ -3712,10 +3663,9 @@ const getBlockStatusComponent = (userId) => {
 
 
 
-  // Проверка прав пользователя
+ 
   const hasPermission = (permission) => {
-    // Здесь должна быть логика проверки прав пользователя
-    // Для демонстрации считаем, что у пользователя есть все права
+   
     return true;
   };
 
@@ -3738,22 +3688,22 @@ const getBlockStatusComponent = (userId) => {
   // Получение списка дисциплин с учетом фильтра
   const getFilteredDisciplines = () => {
     if (showDeleted) {
-      // Показываем все дисциплины, включая удаленные
+     
       return disciplines;
     } else {
-      // Показываем только активные дисциплины
+      
       return disciplines.filter(d => !d.deleted);
     }
   };
 
-  // Подсчет количества активных и удаленных дисциплин
+
   const getDisciplineStats = () => {
     const active = disciplines.filter(d => !d.deleted).length;
     const deleted = disciplines.filter(d => d.deleted).length;
     return { active, deleted };
   };
 
-  // Загрузка данных при переключении вкладок
+
   useEffect(() => {
     if (activeTab === 'Участники') {
       fetchUsers();
@@ -3809,7 +3759,7 @@ const getBlockStatusComponent = (userId) => {
 
         <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', p: 3, minHeight: '100vh' }}>
           
-          {/* ВКЛАДКА ПРОФИЛЬ */}
+          
           {activeTab === 'Профиль' && (
             <Paper sx={{ p: 3, maxWidth: 800 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -5064,38 +5014,38 @@ const getBlockStatusComponent = (userId) => {
                               Проверить
                             </Button>
                           </Tooltip>
-<Tooltip title="Начать тест">
-  <Button
-    variant="contained"
-    color="success"
-    startIcon={<PlayCircleOutlineIcon />}
-    onClick={() => {
-      // Используем текущий тест из цикла map
-      const testObj = {
-        id: test.id, // <-- Используем id текущего теста
-        name: test.name,
-        discipline_name: disciplineTestsDialog.disciplineName
-      };
-      handleStartTestClick(
-        testObj, 
-        disciplineTestsDialog.disciplineName, 
-        disciplineTestsDialog.disciplineId
-      );
-      handleCloseTestsDialog();
-    }}
-  >
-    Начать тест
-  </Button>
-</Tooltip>
-                        <Tooltip title="Просмотреть пользователей, прошедших тест">
-<Button
-  variant="outlined"
-  onClick={() => handleViewTestMarksClick(test, { id: disciplineTestsDialog.disciplineId, name: disciplineTestsDialog.disciplineName })}
->
-  РЕЗУЛЬТАТЫ ТЕСТА
-</Button>
+                          <Tooltip title="Начать тест">
+                            <Button
+                              variant="contained"
+                              color="success"
+                              startIcon={<PlayCircleOutlineIcon />}
+                              onClick={() => {
+                              
+                                const testObj = {
+                                  id: test.id, 
+                                  name: test.name,
+                                  discipline_name: disciplineTestsDialog.disciplineName
+                                };
+                                handleStartTestClick(
+                                  testObj, 
+                                  disciplineTestsDialog.disciplineName, 
+                                  disciplineTestsDialog.disciplineId
+                                );
+                                handleCloseTestsDialog();
+                              }}
+                            >
+                              Начать тест
+                            </Button>
+                          </Tooltip>
+                                                  <Tooltip title="Просмотреть пользователей, прошедших тест">
+                          <Button
+                            variant="outlined"
+                            onClick={() => handleViewTestMarksClick(test, { id: disciplineTestsDialog.disciplineId, name: disciplineTestsDialog.disciplineName })}
+                          >
+                            РЕЗУЛЬТАТЫ ТЕСТА
+                          </Button>
 
-</Tooltip>
+                          </Tooltip>
                           <Tooltip title="Дополнительные действия">
                             <IconButton
                               size="small"
@@ -5226,25 +5176,25 @@ const getBlockStatusComponent = (userId) => {
                       <strong>Всего вопросов:</strong> {questionsDialog.questions.length}
                     </Typography>
                    
-<Tooltip title="Изменить порядок вопросов">
-  <Button
-    variant="outlined"
-    startIcon={<FormatListBulletedIcon />}
-    onClick={handleReorderQuestionsClick}
-  >
-    Порядок вопросов
-  </Button>
-</Tooltip>
+                      <Tooltip title="Изменить порядок вопросов">
+                        <Button
+                          variant="outlined"
+                          startIcon={<FormatListBulletedIcon />}
+                          onClick={handleReorderQuestionsClick}
+                        >
+                          Порядок вопросов
+                        </Button>
+                      </Tooltip>
 
-<Tooltip title="Просмотреть пользователей, прошедших тест">
-  <Button
-    variant="outlined"
-    startIcon={<PeopleIcon />}
-    onClick={handleViewTestUsersClick}
-  >
-    Результаты теста
-  </Button>
-</Tooltip>
+                      <Tooltip title="Просмотреть пользователей, прошедших тест">
+                        <Button
+                          variant="outlined"
+                          startIcon={<PeopleIcon />}
+                          onClick={handleViewTestUsersClick}
+                        >
+                          Результаты теста
+                        </Button>
+                      </Tooltip>
                   </Grid>
                 </Grid>
               </Box>
