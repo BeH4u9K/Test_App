@@ -727,7 +727,7 @@ def format_dict(data: dict) -> str:
             result.append(f"• {key}: {type(value).__name__}")
     return "\n".join(result)
 
-# ============= ОСНОВНОЙ ОБРАБОТЧИК =============
+#ОСНОВНОЙ ОБРАБОТЧИК
 
 @app.post("/handle")
 async def handle_message(request: Request):
@@ -835,11 +835,11 @@ async def handle_anonymous_user_auth(chat_id: int, text: str, user_data: dict):
                 refresh_token = result.get("refresh_token", "")
                 user_id = result.get("user_id", "")
                 
-                # Сохраняем авторизацию (даже если user_id пустой)
+                # Сохраняем авторизацию
                 redis_client.set_authorized_user(chat_id, access_token, refresh_token, user_id)
                 
                 if user_id:
-                    return {"response": f"Вы успешно авторизованы! ID пользователя: {user_id}\nИспользуйте /help для списка команд."}
+                    return {"response": f"Вы успешно авторизованы!\nИспользуйте /help для списка команд."}
                 else:
                     return {"response": "Вы успешно авторизованы! Используйте /help для списка команд."}
             
@@ -887,7 +887,90 @@ async def handle_anonymous_user_auth(chat_id: int, text: str, user_data: dict):
     else:
         return {"response": "Вы в процессе авторизации. Используйте /login для проверки статуса"}
 
-# ============= ЦИКЛИЧЕСКИЕ ЗАПРОСЫ =============
+@app.get("/check_auth_status_all")
+async def check_auth_status_all():
+    """Обработчик циклической проверки статуса анонимных пользователей"""
+    try:
+        # Получаем всех анонимных пользователей
+        anonim_users = redis_client.get_all_anonim_users()
+        results = []
+        
+        for chat_id, user_data in anonim_users.items():
+            login_token = user_data.get("login_token")
+            if login_token:
+                result = await check_auth_status(login_token)
+                
+                if result:
+                    status = result.get("status")
+                    
+                    if status == "granted":
+                        # Авторизация успешна
+                        access_token = result.get("access_token", "")
+                        refresh_token = result.get("refresh_token", "")
+                        user_id = result.get("user_id", "")
+                        
+                        redis_client.set_authorized_user(
+                            chat_id, access_token, refresh_token, user_id
+                        )
+                        
+                        results.append({
+                            "chat_id": chat_id,
+                            "status": "success",
+                            "message": f"Вы успешно авторизованы!"
+                        })
+                    
+                    elif status in ["denied", "expired", "not_found"]:
+                        # Авторизация отклонена
+                        redis_client.delete_user(chat_id)
+                        results.append({
+                            "chat_id": chat_id,
+                            "status": "failed",
+                            "message": "Авторизация отклонена или сессия истекла"
+                        })
+        
+        return {"results": results}
+    except Exception as e:
+        logging.error(f"Error in check_auth_status_all: {e}")
+        return {"results": []}
+
+@app.get("/check_notifications_all")
+async def check_notifications_all():
+    """Обработчик циклической проверки уведомлений"""
+    try:
+        authorized_users = redis_client.get_all_authorized_users()
+        results = []
+        
+        for chat_id, user_data in authorized_users.items():
+            access_token = user_data.get("access_token", "")
+            refresh_token = user_data.get("refresh_token", "")
+            user_id = user_data.get("user_id", "")
+            
+            if access_token:
+                # Запрос уведомлений к Main Module
+                result = await call_api_with_retry(
+                    chat_id, access_token, refresh_token, user_id,
+                    "/api/v1/notifications", "GET"
+                )
+                
+                if isinstance(result, dict) and "notifications" in result:
+                    notifications = result.get("notifications", [])
+                    if notifications:
+                        results.append({
+                            "chat_id": chat_id,
+                            "notifications": notifications,
+                            "message": "У вас новые уведомления"
+                        })
+                        
+                        # Удаление отправленных уведомлений
+                        await call_api_with_retry(
+                            chat_id, access_token, refresh_token, user_id,
+                            "/api/v1/notifications", "DELETE"
+                        )
+        
+        return {"results": results}
+    except Exception as e:
+        logging.error(f"Error in check_notifications_all: {e}")
+        return {"results": []}
 
 @app.get("/health")
 def health_check():
