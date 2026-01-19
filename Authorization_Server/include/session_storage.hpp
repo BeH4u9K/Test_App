@@ -41,8 +41,7 @@ public:
     }
     
     bool update_session_status(const std::string& login_token, AuthStatus new_status,
-                               const std::string& access_token = "",
-                               const std::string& refresh_token = "") {
+        const std::string& access_token = "", const std::string& refresh_token = "") {
         std::lock_guard<std::mutex> lock(mutex_);
         
         auto it = sessions_.find(login_token);

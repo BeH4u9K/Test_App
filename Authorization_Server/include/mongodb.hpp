@@ -21,12 +21,8 @@ private:
     
 public:
     MongoDB(const std::string& host, int port = 5000);
-    
     std::optional<User> find_user(const std::string& email);
-    
     bool create_user(const std::string& email, const std::string& username);
-    
     bool add_tokens(const std::string& email, const std::string& access_token, const std::string& refresh_token);
-    
     bool remove_refresh_token(const std::string& email, const std::string& refresh_token);
 };
