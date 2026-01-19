@@ -15,7 +15,8 @@ def find_user():
     user = users_collection.find_one({"email": email})
     
     if user:
-        return json.loads(json_util.dumps(user))
+        user['_id'] = str(user['_id'])
+        return jsonify(user)
     else:
         return jsonify({"error": "User not found"}), 404
 
@@ -43,7 +44,7 @@ def create_user():
 @app.route('/add_refresh_token', methods=['POST'])
 def add_refresh_token():
     data = request.json
-    
+
     result = users_collection.update_one(
         {"email": data['email']},
         {"$push": {"refresh_tokens": data['refresh_token']}}
@@ -52,17 +53,21 @@ def add_refresh_token():
     if result.modified_count > 0:
         return jsonify({"success": True})
     else:
-        return jsonify({"error": "User not found"}), 404
+        user = users_collection.find_one({"email": data['email']})
+        if user:
+            return jsonify({"success": True, "message": "Token might already exist"})
+        else:
+            return jsonify({"error": "User not found"}), 404
 
 @app.route('/remove_refresh_token', methods=['POST'])
 def remove_refresh_token():
     data = request.json
-    
+
     result = users_collection.update_one(
         {"email": data['email']},
         {"$pull": {"refresh_tokens": data['refresh_token']}}
     )
-    
+
     return jsonify({"success": True})
 
 if __name__ == '__main__':
