@@ -461,6 +461,8 @@ COPY public.user_answer (id, attempt_id, question_id, answer_option_id, created_
 COPY public.user_discipline (user_id, discipline_id) FROM stdin;
 \.
 
+INSERT INTO public.user_discipline (user_id, discipline_id) VALUES (1, 1);
+INSERT INTO public.user_discipline (user_id, discipline_id) VALUES (1, 2);
 
 --
 -- Data for Name: user_role; Type: TABLE DATA; Schema: public; Owner: postgres
