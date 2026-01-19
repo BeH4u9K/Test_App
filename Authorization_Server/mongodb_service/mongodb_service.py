@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
+from datetime import datetime
 from bson import ObjectId, json_util
 import json
 
@@ -15,7 +16,8 @@ def find_user():
     user = users_collection.find_one({"email": email})
     
     if user:
-        return json.loads(json_util.dumps(user))
+        user['_id'] = str(user['_id'])
+        return jsonify(user)
     else:
         return jsonify({"error": "User not found"}), 404
 
@@ -29,7 +31,8 @@ def create_user():
     user_data = {
         "email": data['email'],
         "username": data['username'],
-        "roles": ["Student"],
+        "roles": ["Студент"],
+        "access_tokens": [],
         "refresh_tokens": []
     }
     
@@ -40,29 +43,47 @@ def create_user():
     else:
         return jsonify({"error": "Failed to create user"}), 500
 
-@app.route('/add_refresh_token', methods=['POST'])
-def add_refresh_token():
+@app.route('/add_tokens', methods=['POST'])
+def add_tokens():
     data = request.json
-    
+
     result = users_collection.update_one(
         {"email": data['email']},
-        {"$push": {"refresh_tokens": data['refresh_token']}}
+        {
+            "$push": {
+                "access_tokens": data['access_token'],
+                "refresh_tokens": data['refresh_token']
+            }
+        }
     )
     
     if result.modified_count > 0:
         return jsonify({"success": True})
     else:
-        return jsonify({"error": "User not found"}), 404
+        user = users_collection.find_one({"email": data['email']})
+        if user:
+            users_collection.update_one(
+                {"email": data['email']},
+                {
+                    "$set": {
+                        "access_tokens": [data['access_token']],
+                        "refresh_tokens": [data['refresh_token']]
+                    }
+                }
+            )
+            return jsonify({"success": True})
+        else:
+            return jsonify({"error": "User not found"}), 404
 
 @app.route('/remove_refresh_token', methods=['POST'])
 def remove_refresh_token():
     data = request.json
-    
+
     result = users_collection.update_one(
         {"email": data['email']},
         {"$pull": {"refresh_tokens": data['refresh_token']}}
     )
-    
+
     return jsonify({"success": True})
 
 if __name__ == '__main__':

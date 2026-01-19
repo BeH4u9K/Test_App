@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+
 import { 
   Box, 
   CssBaseline, 
@@ -103,6 +105,15 @@ import SearchIcon from '@mui/icons-material/Search';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import SendIcon from '@mui/icons-material/Send';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+
+
+
+
 
 const drawerWidth = 240;
 const API_BASE_URL = 'http://localhost:8081/api/v1';
@@ -140,13 +151,11 @@ const theme = createTheme({
 
 const menuItems = [
   { text: 'Профиль' },
-  { text: 'Тест' },
   { text: 'Дисциплина' },
-  { text: 'Преподаватель' },
   { text: 'Участники' },
 ];
 
-// Доступные роли в системе
+
 const AVAILABLE_ROLES = [
   { value: 'admin', label: 'Администратор', icon: <AdminPanelSettingsIcon />, color: 'error' },
   { value: 'teacher', label: 'Преподаватель', icon: <SchoolOutlinedIcon />, color: 'warning' },
@@ -154,6 +163,8 @@ const AVAILABLE_ROLES = [
 ];
 
 function PersonalAccount() {
+
+
   const [activeTab, setActiveTab] = useState('Профиль');
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -165,14 +176,17 @@ function PersonalAccount() {
   const [usersLoading, setUsersLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // Состояния для модального окна просмотра пользователя
+
   const [openUserDialog, setOpenUserDialog] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedUserInfo, setSelectedUserInfo] = useState(null);
   const [userInfoLoading, setUserInfoLoading] = useState(false);
   const [userInfoError, setUserInfoError] = useState('');
+  
+  const [testAnswerOptions, setTestAnswerOptions] = useState([]);
 
-  // Диалог редактирования ФИО
+
+
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editUserData, setEditUserData] = useState({
     id: '',
@@ -181,7 +195,7 @@ function PersonalAccount() {
   });
   const [saveLoading, setSaveLoading] = useState(false);
   
-  // Диалог редактирования ролей
+
   const [openRolesDialog, setOpenRolesDialog] = useState(false);
   const [editRolesData, setEditRolesData] = useState({
     id: '',
@@ -190,19 +204,18 @@ function PersonalAccount() {
   });
   const [rolesLoading, setRolesLoading] = useState(false);
   
-  // Диалог блокировки пользователя
+
   const [openBlockDialog, setOpenBlockDialog] = useState(false);
   const [blockUserData, setBlockUserData] = useState({
     id: '',
     name: '',
     currentBlocked: false,
     newBlocked: false,
-    reason: '',
   });
   const [blockLoading, setBlockLoading] = useState(false);
   const [blockStatuses, setBlockStatuses] = useState({});
   
-  // Академическая информация пользователя
+
   const [academicTab, setAcademicTab] = useState(0);
   const [userDisciplines, setUserDisciplines] = useState([]);
   const [userTests, setUserTests] = useState([]);
@@ -211,7 +224,7 @@ function PersonalAccount() {
   const [academicLoading, setAcademicLoading] = useState(false);
   const [academicError, setAcademicError] = useState('');
 
-  // Состояния для работы с дисциплинами
+
   const [disciplineDialog, setDisciplineDialog] = useState({
     open: false,
     mode: 'view',
@@ -220,7 +233,7 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояния для списка тестов дисциплины
+
   const [disciplineTestsDialog, setDisciplineTestsDialog] = useState({
     open: false,
     disciplineId: null,
@@ -230,7 +243,6 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояние для проверки активности теста
   const [testStateDialog, setTestStateDialog] = useState({
     open: false,
     disciplineId: null,
@@ -242,7 +254,22 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояние для активации/деактивации теста
+
+const [viewAttemptDialog, setViewAttemptDialog] = useState({
+  open: false,
+  attemptId: null,
+  userId: null,
+  userName: '',
+  testName: '',
+  questions: [],
+  userAnswers: {},
+  score: 0,
+  status: '',
+  loading: false,
+  error: ''
+});
+
+
   const [activateTestDialog, setActivateTestDialog] = useState({
     open: false,
     disciplineId: null,
@@ -255,7 +282,7 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояние для добавления нового теста
+
   const [addTestDialog, setAddTestDialog] = useState({
     open: false,
     disciplineId: null,
@@ -266,7 +293,7 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояние для удаления теста
+
   const [deleteTestDialog, setDeleteTestDialog] = useState({
     open: false,
     disciplineId: null,
@@ -277,7 +304,7 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Новые состояния для студентов дисциплины
+
   const [disciplineStudentsDialog, setDisciplineStudentsDialog] = useState({
     open: false,
     disciplineId: null,
@@ -295,22 +322,20 @@ function PersonalAccount() {
     }
   });
 
-  // Меню действий для теста
   const [testMenuAnchor, setTestMenuAnchor] = useState(null);
   const [selectedTestForMenu, setSelectedTestForMenu] = useState(null);
   const [selectedDisciplineForMenu, setSelectedDisciplineForMenu] = useState(null);
 
-  // Детальная информация о дисциплине
+
   const [disciplineDetail, setDisciplineDetail] = useState(null);
 
-  // Уведомления
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success',
   });
 
-  // Состояние для удаления дисциплины
+
   const [deleteDisciplineDialog, setDeleteDisciplineDialog] = useState({
     open: false,
     disciplineId: null,
@@ -319,7 +344,7 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Состояние для восстановления дисциплины
+ 
   const [restoreDisciplineDialog, setRestoreDisciplineDialog] = useState({
     open: false,
     disciplineId: null,
@@ -328,16 +353,122 @@ function PersonalAccount() {
     error: ''
   });
 
-  // Флаг для показа удаленных дисциплин
+
   const [showDeleted, setShowDeleted] = useState(false);
 
-  // Меню действий для дисциплины
+  
   const [disciplineMenuAnchor, setDisciplineMenuAnchor] = useState(null);
   const [selectedDisciplineForAction, setSelectedDisciplineForAction] = useState(null);
 
-  const userId = '1';
 
-  // ============= ФУНКЦИИ ДЛЯ УВЕДОМЛЕНИЙ =============
+  const [questionsDialog, setQuestionsDialog] = useState({
+    open: false,
+    testId: null,
+    testName: '',
+    disciplineName: '',
+    questions: [],
+    loading: false,
+    error: ''
+  });
+
+
+  const [createQuestionDialog, setCreateQuestionDialog] = useState({
+    open: false,
+    testId: null,
+    testName: '',
+    title: '',
+    questionText: '',
+    answers: ['', '', '', ''],
+    correctAnswerIndex: 0,
+    loading: false,
+    error: ''
+  });
+
+
+  const [editQuestionDialog, setEditQuestionDialog] = useState({
+    open: false,
+    questionId: null,
+    currentTitle: '',
+    currentQuestionText: '',
+    currentAnswers: ['', '', '', ''],
+    currentCorrectAnswerIndex: 0,
+    currentVersion: 1,
+    title: '',
+    questionText: '',
+    answers: ['', '', '', ''],
+    correctAnswerIndex: 0,
+    loading: false,
+    error: ''
+  });
+
+
+  const [deleteQuestionDialog, setDeleteQuestionDialog] = useState({
+    open: false,
+    questionId: null,
+    questionTitle: '',
+    loading: false,
+    error: ''
+  });
+
+
+  const [questionMenuAnchor, setQuestionMenuAnchor] = useState(null);
+  const [selectedQuestionForMenu, setSelectedQuestionForMenu] = useState(null);
+
+
+  const [addQuestionToTestDialog, setAddQuestionToTestDialog] = useState({
+    open: false,
+    testId: null,
+    testName: '',
+    disciplineId: null,
+    disciplineName: '',
+    allQuestions: [], 
+    selectedQuestionId: '',
+    loading: false,
+    error: ''
+  });
+
+
+const [reorderQuestionsDialog, setReorderQuestionsDialog] = useState({
+  open: false,
+  testId: null,
+  testName: '',
+  disciplineId: null,
+  disciplineName: '',
+  questions: [],
+  loading: false,
+  error: ''
+});
+
+
+
+const [draggedQuestion, setDraggedQuestion] = useState(null);
+
+useEffect(() => {
+  const getMaxId = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/id`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();     
+      setUserId(String(data.id));        
+    } catch (e) {
+      console.error('getMaxId error', e);
+      showSnackbar(e.message, 'error');
+    }
+  };
+
+  getMaxId();
+}, []); 
+
+const [userId, setUserId] = useState(null);
+
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({
       open: true,
@@ -350,9 +481,94 @@ function PersonalAccount() {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  // ============= ОСНОВНЫЕ ФУНКЦИИ ЗАГРУЗКИ =============
 
-  // Загрузка профиля текущего пользователя
+const [startTestDialog, setStartTestDialog] = useState({
+  open: false,
+  testId: null,
+  testName: '',
+  disciplineName: '',
+  attemptId: null, 
+  questions: [],
+  currentQuestionIndex: 0,
+  userAnswers: {},
+  loading: false,
+  error: ''
+});
+
+
+const addStudentToDisciplineExact = async (disciplineId, userId) => {
+  try {
+    setDisciplineStudentsDialog(prev => ({
+      ...prev,
+      addStudentDialog: { ...prev.addStudentDialog, loading: true, error: '' }
+    }));
+
+    console.log(`📡 POST /disciplines/${disciplineId}/students/${userId}`);
+    
+    const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/students/${userId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Добавлен студент:', data);
+
+
+    await fetchDisciplineStudents(disciplineId);
+    showSnackbar('Студент записан на дисциплину!', 'success');
+    
+  } catch (err) {
+    console.error(' Ошибка записи:', err);
+    setDisciplineStudentsDialog(prev => ({
+      ...prev,
+      addStudentDialog: { ...prev.addStudentDialog, error: err.message }
+    }));
+    showSnackbar(`Ошибка: ${err.message}`, 'error');
+  }
+};
+
+
+
+const initializeTest = async (userId, testId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/attempts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ test_id: testId })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    console.log('Полный ответ от сервера при начале теста:', data);
+    
+    if (data.questions && Array.isArray(data.questions)) {
+      console.log('Первый вопрос детально:', data.questions[0]);
+      if (data.questions[0].options) {
+        console.log('Варианты ответа первого вопроса:', data.questions[0].options);
+        console.log('ID вариантов ответа:', data.questions[0].options.map(opt => opt.id));
+      }
+    }
+    
+    return data;
+    
+  } catch (err) {
+    console.error('Ошибка инициализации теста:', err);
+    throw err;
+  }
+};
+
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -371,17 +587,17 @@ function PersonalAccount() {
         const userData = await userResponse.json();
         console.log('Данные пользователя:', userData);
         
-        // Проверяем статус блокировки
+       
         let isBlocked = false;
         if (blockResponse.ok) {
           const blockData = await blockResponse.json();
-          isBlocked = blockData.blocked || false;
+          isBlocked = blockData.is_blocked ?? false;
         }
         
         setUserName(userData.user_name || userData.full_name || userData.name || 'Неизвестный пользователь');
         setUserEmail(userData.email || userData.mail || 'Не указана');
         
-        // Загружаем роли пользователя
+       
         try {
           const rolesResponse = await fetch(`${API_BASE_URL}/users/${userId}/roles`);
           if (rolesResponse.ok) {
@@ -395,7 +611,7 @@ function PersonalAccount() {
           setUserRoles([]);
         }
         
-        // Сохраняем статус блокировки
+       
         setBlockStatuses(prev => ({
           ...prev,
           [userId]: isBlocked
@@ -415,7 +631,7 @@ function PersonalAccount() {
     }
   }, [activeTab, userId]);
 
-  // Загрузка списка всех дисциплин
+ 
   const fetchDisciplines = async () => {
     try {
       setDisciplinesLoading(true);
@@ -470,7 +686,7 @@ function PersonalAccount() {
             
             if (blockResponse.ok) {
               const blockData = await blockResponse.json();
-              isBlocked = blockData.blocked || false;
+              isBlocked = blockData.is_blocked ?? false;
             }
             
             // Обновляем статус блокировки
@@ -532,7 +748,7 @@ function PersonalAccount() {
       
       if (blockResponse.ok) {
         const blockData = await blockResponse.json();
-        isBlocked = blockData.blocked || false;
+        isBlocked = blockData.is_blocked ?? false;
       }
       
       // Обновляем статус блокировки
@@ -556,9 +772,7 @@ function PersonalAccount() {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ ДИСЦИПЛИН =============
-
-  // 1. Получить детальную информацию о дисциплине
+  
   const fetchDisciplineDetail = async (disciplineId) => {
     try {
       setDisciplineDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -638,7 +852,7 @@ function PersonalAccount() {
     }
   };
 
-  // 3. Получить список тестов дисциплины
+  
   const fetchDisciplineTests = async (disciplineId) => {
     try {
       setDisciplineTestsDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -675,14 +889,17 @@ function PersonalAccount() {
   const createDiscipline = async (disciplineData) => {
     try {
       setDisciplineDialog(prev => ({ ...prev, loading: true, error: '' }));
-      
-      const response = await fetch(`${API_BASE_URL}/disciplines`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(disciplineData),
-      });
+  const payload = {
+    name: disciplineData.name?.trim(),
+    description: disciplineData.description?.trim(),
+    teacher_id: Number(userId), 
+  };
+
+  const response = await fetch(`${API_BASE_URL}/disciplines`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -691,7 +908,7 @@ function PersonalAccount() {
       
       const data = await response.json();
       
-      // Обновляем список дисциплин
+      
       fetchDisciplines();
       
       showSnackbar('Дисциплина успешно создана!', 'success');
@@ -707,7 +924,7 @@ function PersonalAccount() {
     }
   };
 
-  // 5. Проверить активность теста
+
   const fetchTestState = async (disciplineId, testId) => {
     try {
       setTestStateDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -740,47 +957,47 @@ function PersonalAccount() {
     }
   };
 
-  // 6. Активировать/деактивировать тест
-  const updateTestState = async (disciplineId, testId, active) => {
-    try {
-      setActivateTestDialog(prev => ({ ...prev, loading: true, error: '' }));
-      
-      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/state`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          active: active
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Обновляем список тестов в диалоге
-      if (disciplineTestsDialog.disciplineId === disciplineId) {
-        fetchDisciplineTests(disciplineId);
-      }
-      
-      showSnackbar(`Тест успешно ${active ? 'активирован' : 'деактивирован'}!`, 'success');
-      return data;
-      
-    } catch (err) {
-      console.error('Ошибка обновления статуса теста:', err);
-      setActivateTestDialog(prev => ({ ...prev, error: err.message }));
-      showSnackbar(`Ошибка обновления статуса теста: ${err.message}`, 'error');
-      throw err;
-    } finally {
-      setActivateTestDialog(prev => ({ ...prev, loading: false }));
+// 6. Активировать/деактивировать тест (ИСПРАВЛЕННЫЙ ВАРИАНТ)
+const updateTestState = async (disciplineId, testId, active) => {
+  try {
+    setActivateTestDialog(prev => ({ ...prev, loading: true, error: '' }));
+    
+    const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/state`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        is_active: active  
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
-  };
+    
+    const data = await response.json();
+    
+  
+    if (disciplineTestsDialog.disciplineId === disciplineId) {
+      fetchDisciplineTests(disciplineId);
+    }
+    
+    showSnackbar(`Тест успешно ${active ? 'активирован' : 'деактивирован'}!`, 'success');
+    return data;
+    
+  } catch (err) {
+    console.error('Ошибка обновления статуса теста:', err);
+    setActivateTestDialog(prev => ({ ...prev, error: err.message }));
+    showSnackbar(`Ошибка обновления статуса теста: ${err.message}`, 'error');
+    throw err;
+  } finally {
+    setActivateTestDialog(prev => ({ ...prev, loading: false }));
+  }
+};
 
-  // 7. Добавить новый тест в дисциплину
+  
   const addTestToDiscipline = async (disciplineId, testData) => {
     try {
       setAddTestDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -800,7 +1017,7 @@ function PersonalAccount() {
       
       const data = await response.json();
       
-      // Обновляем список тестов в диалоге
+      
       if (disciplineTestsDialog.disciplineId === disciplineId) {
         fetchDisciplineTests(disciplineId);
       }
@@ -818,7 +1035,7 @@ function PersonalAccount() {
     }
   };
 
-  // 8. Удалить тест из дисциплины
+
   const deleteTestFromDiscipline = async (disciplineId, testId) => {
     try {
       setDeleteTestDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -834,7 +1051,7 @@ function PersonalAccount() {
       
       const data = await response.json();
       
-      // Обновляем список тестов в диалоге
+
       if (disciplineTestsDialog.disciplineId === disciplineId) {
         fetchDisciplineTests(disciplineId);
       }
@@ -852,9 +1069,7 @@ function PersonalAccount() {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ СТУДЕНТОВ ДИСЦИПЛИНЫ =============
 
-  // 9. Получить список студентов дисциплины
   const fetchDisciplineStudents = async (disciplineId) => {
     try {
       setDisciplineStudentsDialog(prev => ({ 
@@ -873,15 +1088,14 @@ function PersonalAccount() {
       const data = await response.json();
       console.log('Ответ от /students:', data);
       
-      // Проверьте формат данных
+     
       if (!Array.isArray(data)) {
         console.error('Ответ не является массивом:', typeof data, data);
         throw new Error('Некорректный формат данных студентов');
       }
       
-      // Если данные уже содержат информацию о студентах
+      
       if (data.length > 0 && typeof data[0] === 'object' && data[0].id) {
-        // Формат: [{id: 1, name: "Иван", email: "ivan@example.com"}, ...]
         const studentsWithDetails = data.map(student => ({
           id: student.id,
           name: student.full_name || student.name || student.user_name || 'Неизвестный',
@@ -897,9 +1111,9 @@ function PersonalAccount() {
         return studentsWithDetails;
       }
       
-      // Если данные содержат только ID студентов
+      
       if (data.length > 0 && typeof data[0] === 'number' || typeof data[0] === 'string') {
-        // Формат: [1, 2, 3] или ["1", "2", "3"]
+        
         const studentsWithDetails = await Promise.all(
           data.map(async (studentId) => {
             try {
@@ -951,50 +1165,42 @@ function PersonalAccount() {
     }
   };
 
-  // 10. Записать пользователя на дисциплину
-  const addStudentToDiscipline = async (disciplineId, studentId) => {
-    try {
-      setDisciplineStudentsDialog(prev => ({
-        ...prev,
-        addStudentDialog: { ...prev.addStudentDialog, loading: true, error: '' }
-      }));
-      
-      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/students`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          student_id: studentId
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      // Обновляем список студентов
-      await fetchDisciplineStudents(disciplineId);
-      
-      showSnackbar('Пользователь успешно записан на дисциплину!', 'success');
-      return true;
-      
-    } catch (err) {
-      console.error('Ошибка записи пользователя на дисциплину:', err);
-      setDisciplineStudentsDialog(prev => ({
-        ...prev,
-        addStudentDialog: { ...prev.addStudentDialog, error: err.message, loading: false }
-      }));
-      showSnackbar(`Ошибка записи пользователя: ${err.message}`, 'error');
-      throw err;
-    }
-  };
+const addStudentToDiscipline = async (disciplineId, studentId) => {
+  try {
+    setDisciplineStudentsDialog(prev => ({
+      ...prev,
+      addStudentDialog: { ...prev.addStudentDialog, loading: true, error: '' }
+    }));
 
-  // 11. Отчислить пользователя с дисциплины
+    const url = `${API_BASE_URL}/disciplines/${disciplineId}/students/${studentId}`;
+    console.log('POST', url);
+
+    const response = await fetch(url, { method: 'POST' });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}`);
+    }
+
+    await fetchDisciplineStudents(disciplineId);
+    showSnackbar('Пользователь записан на дисциплину!', 'success');
+  } catch (err) {
+    console.error('Ошибка записи пользователя:', err);
+    setDisciplineStudentsDialog(prev => ({
+      ...prev,
+      addStudentDialog: { ...prev.addStudentDialog, loading: false, error: err.message }
+    }));
+    showSnackbar(`Ошибка записи пользователя: ${err.message}`, 'error');
+    throw err;
+  }
+};
+
+
+
+ 
   const removeStudentFromDiscipline = async (disciplineId, studentId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/users/${studentId}`, {
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/students/${studentId}`, {
         method: 'DELETE',
       });
       
@@ -1003,7 +1209,7 @@ function PersonalAccount() {
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
       
-      // Обновляем список студентов
+      
       await fetchDisciplineStudents(disciplineId);
       
       showSnackbar('Пользователь успешно отчислен с дисциплины!', 'success');
@@ -1016,7 +1222,7 @@ function PersonalAccount() {
     }
   };
 
-  // 12. Загрузить список всех пользователей для выбора
+  
   const fetchAllUsersForSelection = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/users`);
@@ -1028,7 +1234,7 @@ function PersonalAccount() {
       const data = await response.json();
       const usersArray = Array.isArray(data) ? data : [];
       
-      // Фильтруем только студентов (можно добавить дополнительную логику фильтрации)
+     
       const filteredUsers = usersArray.filter(user => 
         !user.roles || 
         user.roles.includes('student') || 
@@ -1053,9 +1259,6 @@ function PersonalAccount() {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ МЯГКОГО УДАЛЕНИЯ ДИСЦИПЛИНЫ =============
-
-  // 13. Отметить дисциплину как удаленную (мягкое удаление)
   const deleteDiscipline = async (disciplineId) => {
     try {
       setDeleteDisciplineDialog(prev => ({ ...prev, loading: true, error: '' }));
@@ -1071,12 +1274,12 @@ function PersonalAccount() {
       
       const data = await response.json();
       
-      // Обновляем список дисциплин
+
       setDisciplines(prev => 
         prev.map(d => d.id === disciplineId ? { ...d, deleted: true } : d)
       );
       
-      // Закрываем все открытые диалоги для этой дисциплины
+     
       if (disciplineDialog.data?.id === disciplineId) {
         handleCloseDisciplineDialog();
       }
@@ -1110,7 +1313,7 @@ function PersonalAccount() {
       
       const data = await response.json();
       
-      // Обновляем список дисциплин
+      
       setDisciplines(prev => 
         prev.map(d => d.id === disciplineId ? { ...d, deleted: false } : d)
       );
@@ -1128,9 +1331,7 @@ function PersonalAccount() {
     }
   };
 
-  // ============= ФУНКЦИИ ДЛЯ РЕДАКТИРОВАНИЯ ПОЛЬЗОВАТЕЛЕЙ =============
 
-  // Изменение ФИО пользователя
   const updateUserName = async (userId, newName) => {
     try {
       setSaveLoading(true);
@@ -1153,7 +1354,7 @@ function PersonalAccount() {
       const result = await response.json();
       showSnackbar('ФИО успешно изменено!', 'success');
       
-      // Обновить данные в UI
+      
       if (selectedUserInfo?.id === userId) {
         setSelectedUserInfo({
           ...selectedUserInfo,
@@ -1209,7 +1410,7 @@ function PersonalAccount() {
       const result = await response.json();
       showSnackbar('Роли успешно обновлены!', 'success');
       
-      // Обновить данные в UI
+      
       if (selectedUserInfo?.id === userId) {
         setSelectedUserInfo({
           ...selectedUserInfo,
@@ -1243,18 +1444,362 @@ function PersonalAccount() {
   };
 
   // Изменение статуса блокировки пользователя
-  const updateUserBlockStatus = async (userId, blocked, reason = '') => {
+const updateUserBlockStatus = async (userId, blocked, reason) => {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/state`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      is_blocked: blocked,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `HTTP ${response.status}`);
+  }
+
+  return await response.json();
+};
+
+
+  const fetchTestQuestions = async (disciplineId, testId) => {
     try {
-      setBlockLoading(true);
+      setQuestionsDialog(prev => ({ ...prev, loading: true, error: '' }));
       
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/state`, {
-        method: 'PUT',
+      
+      const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/questions`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const allQuestions = await response.json();
+      
+      
+      const filteredQuestions = filterLatestQuestionVersions(allQuestions);
+      
+      setQuestionsDialog(prev => ({
+        ...prev,
+        questions: filteredQuestions,
+        loading: false
+      }));
+      
+      return filteredQuestions;
+      
+    } catch (err) {
+      console.error('Ошибка загрузки вопросов теста:', err);
+      setQuestionsDialog(prev => ({ 
+        ...prev, 
+        error: err.message,
+        loading: false
+      }));
+      showSnackbar(`Ошибка загрузки вопросов: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // Функция для фильтрации последних версий вопросов
+  const filterLatestQuestionVersions = (questions) => {
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return [];
+    }
+    
+    // Группируем вопросы по названию
+    const questionGroups = {};
+    
+    questions.forEach(question => {
+      const questionName = question.name || question.question_name || question.title || 'Без названия';
+      const questionId = question.question_id || question.id;
+      const version = question.version || 1;
+      const authorId = question.author_id || question.created_by || null;
+      
+      if (!questionGroups[questionName]) {
+        questionGroups[questionName] = [];
+      }
+      
+      questionGroups[questionName].push({
+        id: questionId,
+        name: questionName,
+        version,
+        authorId,
+        rawQuestion: question
+      });
+    });
+    
+   
+    const result = [];
+    
+    Object.values(questionGroups).forEach(group => {
+      if (group.length > 0) {
+        
+        const sortedGroup = [...group].sort((a, b) => b.version - a.version);
+        result.push(sortedGroup[0]); 
+      }
+    });
+    
+    return result;
+  };
+
+
+const fetchAttemptResults = async (userId, attemptId) => {
+  try {
+    setViewAttemptDialog(prev => ({ ...prev, loading: true, error: '' }));
+    
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/attempts/${attemptId}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+
+    const formattedQuestions = data.answers?.map((answer, index) => ({
+      id: index,
+      question_text: answer.question_text || `Вопрос ${index + 1}`,
+      user_answer: answer.answer_text || '',
+      is_correct: answer.is_correct || false,
+      correct_answer: answer.correct_answer || ''
+    })) || [];
+    
+    setViewAttemptDialog(prev => ({
+      ...prev,
+      questions: formattedQuestions,
+      userAnswers: formattedQuestions.reduce((acc, question, index) => {
+        acc[index] = question.user_answer;
+        return acc;
+      }, {}),
+      score: data.score || 0,
+      status: data.status || 'completed',
+      loading: false
+    }));
+    
+    return data;
+    
+  } catch (err) {
+    console.error('Ошибка загрузки результатов попытки:', err);
+    setViewAttemptDialog(prev => ({ 
+      ...prev, 
+      error: err.message,
+      loading: false
+    }));
+    showSnackbar(`Ошибка загрузки результатов: ${err.message}`, 'error');
+    throw err;
+  }
+};
+
+  // 15. Создать новый вопрос
+const createQuestion = async (testId, questionData) => {
+  try {
+    setCreateQuestionDialog(prev => ({ ...prev, loading: true, error: '' }));
+    const disciplineId = questionsDialog.disciplineId; // Из контекста диалога
+    if (!disciplineId) throw new Error('Discipline ID не найден');
+    
+const requestData = {
+  title: questionData.title,
+  text: questionData.questionText,
+  answers: questionData.answers.map((answerText, index) => ({
+    text: answerText.trim(),
+    is_correct: index === parseInt(questionData.correctAnswerIndex)
+  }))
+};
+    const response = await fetch(`${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/questions`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(requestData),
+});
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`${errorData.message || 'HTTP'} ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (questionsDialog.testId === testId && disciplineId) {
+      await fetchTestQuestions(disciplineId, testId); // Рефреш списка
+    }
+    showSnackbar('Вопрос создан!', 'success');
+    return data;
+  } catch (err) {
+    console.error('createQuestion error:', err);
+    setCreateQuestionDialog(prev => ({ ...prev, error: err.message }));
+    showSnackbar(err.message, 'error');
+    throw err;
+  } finally {
+    setCreateQuestionDialog(prev => ({ ...prev, loading: false }));
+  }
+};
+
+
+// 16. Изменить вопрос (создать новую версию)
+const updateQuestion = async (questionId, questionData) => {
+  try {
+    setEditQuestionDialog(prev => ({ ...prev, loading: true, error: '' }));
+    
+
+    const requestData = {
+      title: questionData.title,
+      question_text: questionData.questionText,
+      answers: questionData.answers.filter(answer => answer.trim() !== ''), 
+      correct_answer: questionData.correctAnswerIndex,
+      version: questionData.currentVersion + 1 
+    };
+    
+    const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Обновляем список вопросов в диалоге
+    if (questionsDialog.testId) {
+      
+      const disciplineId = questionsDialog.disciplineId;
+      if (disciplineId) {
+        await fetchTestQuestions(disciplineId, questionsDialog.testId);
+      }
+    }
+    
+    showSnackbar('Вопрос успешно обновлен!', 'success');
+    return data;
+    
+  } catch (err) {
+    console.error('Ошибка обновления вопроса:', err);
+    setEditQuestionDialog(prev => ({ ...prev, error: err.message }));
+    showSnackbar(`Ошибка обновления вопроса: ${err.message}`, 'error');
+    throw err;
+  } finally {
+    setEditQuestionDialog(prev => ({ ...prev, loading: false }));
+  }
+};
+
+  // 17. Удалить вопрос (мягкое удаление)
+  const deleteQuestion = async (questionId) => {
+    try {
+      setDeleteQuestionDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      const response = await fetch(`${API_BASE_URL}/questions/${questionId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+     
+      if (questionsDialog.testId) {
+       
+        const disciplineId = questionsDialog.disciplineId;
+        if (disciplineId) {
+          await fetchTestQuestions(disciplineId, questionsDialog.testId);
+        }
+      }
+      
+      showSnackbar('Вопрос успешно удален!', 'success');
+      return data;
+      
+    } catch (err) {
+      console.error('Ошибка удаления вопроса:', err);
+      setDeleteQuestionDialog(prev => ({ ...prev, error: err.message }));
+      showSnackbar(`Ошибка удаления вопроса: ${err.message}`, 'error');
+      throw err;
+    } finally {
+      setDeleteQuestionDialog(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  
+
+  // 18. Проверить, есть ли попытки прохождения теста
+  const checkTestAttempts = async (testId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/tests/${testId}/attempts`);
+      
+      if (!response.ok) {
+        
+        if (response.status === 404) {
+          return []; 
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+      
+    } catch (err) {
+      console.error('Ошибка проверки попыток теста:', err);
+      
+      return [];
+    }
+  };
+
+  
+  const fetchAllQuestions = async () => {
+    try {
+      
+      const response = await fetch(`${API_BASE_URL}/questions`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Фильтруем только последние версии вопросов
+      const filteredQuestions = filterLatestQuestionVersions(data);
+      
+      setAddQuestionToTestDialog(prev => ({
+        ...prev,
+        allQuestions: filteredQuestions,
+        loading: false
+      }));
+      
+      return filteredQuestions;
+      
+    } catch (err) {
+      console.error('Ошибка загрузки всех вопросов:', err);
+      setAddQuestionToTestDialog(prev => ({ 
+        ...prev, 
+        error: err.message,
+        loading: false
+      }));
+      showSnackbar(`Ошибка загрузки вопросов: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+  // 20. Добавить вопрос в тест (если нет попыток)
+  const addQuestionToTest = async (testId, questionId) => {
+    try {
+      setAddQuestionToTestDialog(prev => ({ ...prev, loading: true, error: '' }));
+      
+      // Проверяем, есть ли попытки прохождения теста
+      const attempts = await checkTestAttempts(testId);
+      
+      if (attempts.length > 0) {
+        throw new Error('Невозможно добавить вопрос: тест уже имеет попытки прохождения');
+      }
+      
+      // Добавляем вопрос в тест в последнюю позицию
+      const response = await fetch(`${API_BASE_URL}/tests/${testId}/questions/${questionId}`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          blocked: blocked,
-          reason: reason || undefined,
+          position: -1 
         }),
       });
       
@@ -1263,47 +1808,495 @@ function PersonalAccount() {
         throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const result = await response.json();
+      const data = await response.json();
       
-      const action = blocked ? 'заблокирован' : 'разблокирован';
-      showSnackbar(`Пользователь успешно ${action}!`, 'success');
-      
-      // Обновляем статус блокировки
-      setBlockStatuses(prev => ({
-        ...prev,
-        [userId]: blocked
-      }));
-      
-      // Обновить данные в UI
-      if (selectedUserInfo?.id === userId) {
-        setSelectedUserInfo({
-          ...selectedUserInfo,
-          blocked: blocked
-        });
+      // Обновляем список вопросов в диалоге
+      if (questionsDialog.testId === testId) {
+        // Перезагружаем вопросы
+        const disciplineId = questionsDialog.disciplineId;
+        if (disciplineId) {
+          await fetchTestQuestions(disciplineId, testId);
+        }
       }
       
-      if (activeTab === 'Участники') {
-        setUsers(prevUsers => 
-          prevUsers.map(user => 
-            user.id === userId 
-              ? { ...user, blocked: blocked }
-              : user
-          )
-        );
-      }
-      
-      return result;
+      showSnackbar('Вопрос успешно добавлен в тест!', 'success');
+      return data;
       
     } catch (err) {
-      console.error('Ошибка обновления статуса блокировки:', err);
-      showSnackbar(`Ошибка: ${err.message}`, 'error');
+      console.error('Ошибка добавления вопроса в тест:', err);
+      setAddQuestionToTestDialog(prev => ({ ...prev, error: err.message }));
+      showSnackbar(`Ошибка добавления вопроса в тест: ${err.message}`, 'error');
       throw err;
     } finally {
-      setBlockLoading(false);
+      setAddQuestionToTestDialog(prev => ({ ...prev, loading: false }));
     }
   };
+  const checkTestAttemptsForReorder = async (testId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/tests/${testId}/attempts`);
+    
+    if (!response.ok) {
+     
+      if (response.status === 404) {
+        return []; 
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+    
+  } catch (err) {
+    console.error('Ошибка проверки попыток теста для изменения порядка:', err);
+    
+    return [];
+  }
+};
+
+// 22. Изменить порядок вопросов в тесте
+const reorderTestQuestions = async (testId, questionOrder) => {
+  try {
+    setReorderQuestionsDialog(prev => ({ ...prev, loading: true, error: '' }));
+    
+   
+    const attempts = await checkTestAttemptsForReorder(testId);
+    
+    if (attempts.length > 0) {
+      throw new Error('Невозможно изменить порядок вопросов: тест уже имеет попытки прохождения');
+    }
+    
+    // Отправляем новый порядок вопросов
+    const response = await fetch(`${API_BASE_URL}/tests/${testId}/questions/order`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        question_order: questionOrder
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Обновляем список вопросов в диалоге
+    if (questionsDialog.testId === testId) {
+      // Перезагружаем вопросы
+      const disciplineId = questionsDialog.disciplineId;
+      if (disciplineId) {
+        await fetchTestQuestions(disciplineId, testId);
+      }
+    }
+    
+    showSnackbar('Порядок вопросов успешно изменен!', 'success');
+    return data;
+    
+  } catch (err) {
+    console.error('Ошибка изменения порядка вопросов:', err);
+    setReorderQuestionsDialog(prev => ({ ...prev, error: err.message }));
+    showSnackbar(`Ошибка изменения порядка вопросов: ${err.message}`, 'error');
+    throw err;
+  } finally {
+    setReorderQuestionsDialog(prev => ({ ...prev, loading: false }));
+  }
+};
+
+
+
+const fetchTestUsers = async (testId) => {
+  try {
+    setTestUsersDialog(prev => ({ ...prev, loading: true, error: '', users: [] }));
+    
+    // Получаем все попытки по тесту
+    const attemptsResponse = await fetch(`${API_BASE_URL}/tests/${testId}/attempts`);
+    
+    if (!attemptsResponse.ok) {
+      throw new Error(`HTTP ${attemptsResponse.status}: ${attemptsResponse.statusText}`);
+    }
+    
+    const attempts = await attemptsResponse.json();
+    
+    if (!Array.isArray(attempts) || attempts.length === 0) {
+      setTestUsersDialog(prev => ({ ...prev, loading: false, users: [] }));
+      return [];
+    }
+    
+   
+    const userAttemptsMap = {};
+    
+    attempts.forEach(attempt => {
+      const userId = attempt.user_id;
+      if (!userAttemptsMap[userId]) {
+        userAttemptsMap[userId] = [];
+      }
+      userAttemptsMap[userId].push({
+        id: attempt.id,
+        started_at: attempt.started_at,
+        completed_at: attempt.completed_at,
+        score: attempt.score || 0
+      });
+    });
+    
+    // Получаем информацию о пользователях
+    const usersWithDetails = await Promise.all(
+      Object.keys(userAttemptsMap).map(async (userId) => {
+        try {
+          const userResponse = await fetch(`${API_BASE_URL}/users/${userId}`);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            return {
+              id: userId,
+              name: userData.full_name || userData.name || 'Неизвестный',
+              email: userData.email || userData.mail || 'Не указан',
+              attempts: userAttemptsMap[userId],
+              // Вычисляем лучшую оценку
+              bestScore: Math.max(...userAttemptsMap[userId].map(a => a.score || 0)),
+              // Вычисляем количество попыток
+              attemptsCount: userAttemptsMap[userId].length,
+              // Последняя попытка
+              lastAttempt: userAttemptsMap[userId].reduce((latest, current) => {
+                const currentTime = new Date(current.completed_at || current.started_at);
+                const latestTime = new Date(latest.completed_at || latest.started_at);
+                return currentTime > latestTime ? current : latest;
+              })
+            };
+          }
+          return {
+            id: userId,
+            name: 'Неизвестный пользователь',
+            email: 'Не указан',
+            attempts: userAttemptsMap[userId],
+            bestScore: Math.max(...userAttemptsMap[userId].map(a => a.score || 0)),
+            attemptsCount: userAttemptsMap[userId].length
+          };
+        } catch (err) {
+          console.error(`Ошибка загрузки пользователя ${userId}:`, err);
+          return {
+            id: userId,
+            name: 'Ошибка загрузки',
+            email: '—',
+            attempts: userAttemptsMap[userId],
+            bestScore: 0,
+            attemptsCount: userAttemptsMap[userId].length
+          };
+        }
+      })
+    );
+    
+    // Сортируем по лучшей оценке (по убыванию)
+    usersWithDetails.sort((a, b) => b.bestScore - a.bestScore);
+    
+    setTestUsersDialog(prev => ({
+      ...prev,
+      users: usersWithDetails,
+      loading: false
+    }));
+    
+    return usersWithDetails;
+    
+  } catch (err) {
+    console.error('Ошибка загрузки пользователей теста:', err);
+    setTestUsersDialog(prev => ({ 
+      ...prev, 
+      error: err.message,
+      loading: false
+    }));
+    showSnackbar(`Ошибка загрузки пользователей теста: ${err.message}`, 'error');
+    throw err;
+  }
+};
+
+// 24. Получить ответы пользователя в конкретной попытке
+const fetchUserAttemptAnswers = async (attemptId) => {
+  try {
+    setUserAttemptDialog(prev => ({ ...prev, loading: true, error: '', answers: [] }));
+    
+    
+    const response = await fetch(`${API_BASE_URL}/attempts/${attemptId}/answers`);
+    
+    if (!response.ok) {
+      // Если endpoint не существует, возвращаем заглушку
+      if (response.status === 404) {
+        // Генерируем тестовые данные для демонстрации
+        return generateMockAnswers();
+      }
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const answers = await response.json();
+    
+    setUserAttemptDialog(prev => ({
+      ...prev,
+      answers: Array.isArray(answers) ? answers : [],
+      loading: false
+    }));
+    
+    return answers;
+    
+  } catch (err) {
+    console.error('Ошибка загрузки ответов пользователя:', err);
+    setUserAttemptDialog(prev => ({ 
+      ...prev, 
+      error: err.message,
+      loading: false
+    }));
+    showSnackbar(`Ошибка загрузки ответов: ${err.message}`, 'error');
+    throw err;
+  }
+};
+
+
+const completeTestAttempt = async (userId, attemptId, answers) => {
+  try {
+    
+    const response = await fetch(`${API_BASE_URL}/users/${userId}/attempts/${attemptId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        answers: answers
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data;
+    
+  } catch (err) {
+    console.error('Ошибка завершения теста:', err);
+    throw err;
+  }
+};
+
+
+const checkIsTeacherOnCourse = async (userId, disciplineId) => {
+  try {
+    
+    return true;
+  } catch (err) {
+    console.error('Ошибка проверки роли преподавателя:', err);
+    return false;
+  }
+};
 
   // ============= ОБРАБОТЧИКИ СОБЫТИЙ =============
+
+  // Обработчик для просмотра результатов попытки
+const handleViewAttemptResults = async (userId, attemptId, userName = '', testName = '') => {
+  setViewAttemptDialog({
+    open: true,
+    attemptId,
+    userId,
+    userName,
+    testName,
+    questions: [],
+    userAnswers: {},
+    score: 0,
+    status: '',
+    loading: true,
+    error: ''
+  });
+  
+  try {
+    await fetchAttemptResults(userId, attemptId);
+  } catch (err) {
+    // Ошибка уже обработана в fetchAttemptResults
+  }
+};
+
+  // Обработчик для открытия списка пользователей, прошедших тест
+const handleViewTestUsersClick = () => {
+  setTestUsersDialog({
+    open: true,
+    testId: questionsDialog.testId,
+    testName: questionsDialog.testName,
+    disciplineId: questionsDialog.disciplineId,
+    disciplineName: questionsDialog.disciplineName,
+    users: [],
+    loading: true,
+    error: ''
+  });
+  
+  // Загружаем пользователей
+  fetchTestUsers(questionsDialog.testId);
+};
+
+// Обработчик для открытия детальной информации о попытке пользователя
+const handleViewUserAttempts = async (user) => {
+  setUserAttemptDialog({
+    open: true,
+    userId: user.id,
+    userName: user.name,
+    testId: testUsersDialog.testId,
+    testName: testUsersDialog.testName,
+    attempts: user.attempts,
+    selectedAttempt: user.attempts[0], // Выбираем первую попытку по умолчанию
+    answers: [],
+    loading: false,
+    error: ''
+  });
+  
+  // Проверяем права доступа
+  const isTeacher = await checkIsTeacherOnCourse(userId, testUsersDialog.disciplineId);
+  
+  if (!isTeacher) {
+    showSnackbar('Только преподаватели могут просматривать ответы пользователей', 'warning');
+  }
+};
+
+// Обработчик для выбора конкретной попытки
+const handleSelectAttempt = (attempt) => {
+  setUserAttemptDialog(prev => ({
+    ...prev,
+    selectedAttempt: attempt,
+    answers: [],
+    loading: true
+  }));
+  
+  // Загружаем ответы для выбранной попытки
+  fetchUserAttemptAnswers(attempt.id);
+};
+
+// Обработчик для закрытия диалога пользователей теста
+const handleCloseTestUsersDialog = () => {
+  setTestUsersDialog({
+    open: false,
+    testId: null,
+    testName: '',
+    disciplineId: null,
+    disciplineName: '',
+    users: [],
+    loading: false,
+    error: ''
+  });
+  setSearchTerm('');
+};
+
+// Обработчик для закрытия диалога попыток пользователя
+const handleCloseUserAttemptDialog = () => {
+  setUserAttemptDialog({
+    open: false,
+    userId: null,
+    userName: '',
+    testId: null,
+    testName: '',
+    attempts: [],
+    selectedAttempt: null,
+    answers: [],
+    loading: false,
+    error: ''
+  });
+};
+
+// Фильтрация пользователей по поисковому запросу
+const getFilteredUsers = () => {
+  const { users } = testUsersDialog;
+  
+  if (!searchTerm.trim()) {
+    return users;
+  }
+  
+  const term = searchTerm.toLowerCase();
+  return users.filter(user =>
+    user.name.toLowerCase().includes(term) ||
+    user.email.toLowerCase().includes(term) ||
+    user.id.toString().includes(term)
+  );
+};
+
+  // Обработчик для открытия диалога изменения порядка вопросов
+const handleReorderQuestionsClick = () => {
+  // Проверяем, есть ли вопросы для упорядочивания
+  if (!questionsDialog.questions || questionsDialog.questions.length === 0) {
+    showSnackbar('Нет вопросов для изменения порядка', 'warning');
+    return;
+  }
+  
+  setReorderQuestionsDialog({
+    open: true,
+    testId: questionsDialog.testId,
+    testName: questionsDialog.testName,
+    disciplineId: questionsDialog.disciplineId,
+    disciplineName: questionsDialog.disciplineName,
+    questions: [...questionsDialog.questions], // Копируем вопросы
+    loading: false,
+    error: ''
+  });
+};
+
+// Обработчик для сохранения нового порядка вопросов
+const handleSaveQuestionOrder = async () => {
+  try {
+    // Создаем массив ID вопросов в новом порядке
+    const questionOrder = reorderQuestionsDialog.questions.map(q => q.id);
+    
+    await reorderTestQuestions(
+      reorderQuestionsDialog.testId,
+      questionOrder
+    );
+    handleCloseReorderQuestionsDialog();
+  } catch (err) {
+    // Ошибка уже обработана
+  }
+};
+
+// Обработчик для закрытия диалога изменения порядка
+const handleCloseReorderQuestionsDialog = () => {
+  setReorderQuestionsDialog({
+    open: false,
+    testId: null,
+    testName: '',
+    disciplineId: null,
+    disciplineName: '',
+    questions: [],
+    loading: false,
+    error: ''
+  });
+  setDraggedQuestion(null);
+};
+
+
+const handleDragStart = (event, question, index) => {
+  setDraggedQuestion({ question, index });
+  event.dataTransfer.effectAllowed = 'move';
+};
+
+const handleDragOver = (event, index) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+};
+
+const handleDrop = (event, targetIndex) => {
+  event.preventDefault();
+  
+  if (draggedQuestion === null) return;
+  
+  const sourceIndex = draggedQuestion.index;
+  if (sourceIndex === targetIndex) return;
+  
+
+  const newQuestions = [...reorderQuestionsDialog.questions];
+  
+
+  const [removed] = newQuestions.splice(sourceIndex, 1);
+
+  newQuestions.splice(targetIndex, 0, removed);
+
+  setReorderQuestionsDialog(prev => ({
+    ...prev,
+    questions: newQuestions
+  }));
+  
+  setDraggedQuestion(null);
+};
 
   // Обработчики для дисциплин
   const handleViewDisciplineClick = async (discipline) => {
@@ -1348,6 +2341,34 @@ function PersonalAccount() {
     
     try {
       await fetchDisciplineTests(discipline.id);
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Обработчик для просмотра вопросов теста
+  const handleViewTestQuestions = async (test, disciplineName = '', disciplineId = null) => {
+    // Получаем ID дисциплины из контекста
+    const actualDisciplineId = disciplineId || disciplineTestsDialog.disciplineId;
+    
+    if (!actualDisciplineId) {
+      showSnackbar('Ошибка: не указан ID дисциплины', 'error');
+      return;
+    }
+    
+    setQuestionsDialog({
+      open: true,
+      testId: test.id,
+      testName: test.name || 'Без названия',
+      disciplineName: disciplineName || test.discipline_name || '',
+      disciplineId: actualDisciplineId, // Сохраняем ID дисциплины
+      questions: [],
+      loading: true,
+      error: ''
+    });
+    
+    try {
+      await fetchTestQuestions(actualDisciplineId, test.id);
     } catch (err) {
       // Ошибка уже обработана
     }
@@ -1407,24 +2428,20 @@ function PersonalAccount() {
     }));
   };
 
-  const handleAddStudentToDiscipline = async () => {
-    const studentId = disciplineStudentsDialog.addStudentDialog.studentId;
-    
-    if (!studentId.trim()) {
-      showSnackbar('Выберите пользователя для записи', 'warning');
-      return;
-    }
-    
-    try {
-      await addStudentToDiscipline(
-        disciplineStudentsDialog.disciplineId,
-        studentId
-      );
-      handleCloseAddStudentDialog();
-    } catch (err) {
-      // Ошибка уже обработана
-    }
-  };
+const handleAddStudentToDiscipline = async () => {
+  const studentId = disciplineStudentsDialog.addStudentDialog.studentId;
+  if (!studentId?.toString().trim()) {
+    showSnackbar('Выберите пользователя!', 'warning');
+    return;
+  }
+
+  try {
+    await addStudentToDiscipline(disciplineStudentsDialog.disciplineId, studentId);
+    handleCloseAddStudentDialog();
+  } catch (err) {
+    console.error('handleAddStudentToDiscipline error:', err);
+  }
+};
 
   const handleRemoveStudentFromDiscipline = async (studentId) => {
     if (!confirm(`Вы уверены, что хотите отчислить студента с ID ${studentId} с дисциплины?`)) {
@@ -1500,6 +2517,534 @@ function PersonalAccount() {
       loading: false,
       error: ''
     });
+  };
+
+  // ============= НОВЫЕ ОБРАБОТЧИКИ ДЛЯ ВОПРОСОВ =============
+
+  // Обработчик для создания вопроса
+  const handleCreateQuestionClick = () => {
+    setCreateQuestionDialog({
+      open: true,
+      testId: questionsDialog.testId,
+      testName: questionsDialog.testName,
+      title: '',
+      questionText: '',
+      answers: ['', '', '', ''],
+      correctAnswerIndex: 0,
+      loading: false,
+      error: ''
+    });
+  };
+
+
+  const handleEditQuestionClick = (question) => {
+    const rawQuestion = question.rawQuestion;
+    
+    setEditQuestionDialog({
+      open: true,
+      questionId: question.id,
+      currentTitle: question.name,
+      currentQuestionText: rawQuestion.question_text || rawQuestion.text || '',
+      currentAnswers: rawQuestion.answers || ['', '', '', ''],
+      currentCorrectAnswerIndex: rawQuestion.correct_answer || 0,
+      currentVersion: question.version,
+      title: question.name,
+      questionText: rawQuestion.question_text || rawQuestion.text || '',
+      answers: rawQuestion.answers || ['', '', '', ''],
+      correctAnswerIndex: rawQuestion.correct_answer || 0,
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Обработчик для удаления вопроса
+  const handleDeleteQuestionClick = (question) => {
+    setDeleteQuestionDialog({
+      open: true,
+      questionId: question.id,
+      questionTitle: question.name,
+      loading: false,
+      error: ''
+    });
+  };
+  
+
+
+  const handleAddQuestionToTestClick = () => {
+    setAddQuestionToTestDialog({
+      open: true,
+      testId: questionsDialog.testId,
+      testName: questionsDialog.testName,
+      disciplineId: questionsDialog.disciplineId,
+      disciplineName: questionsDialog.disciplineName,
+      allQuestions: [],
+      selectedQuestionId: '',
+      loading: true,
+      error: ''
+    });
+
+  
+const [editQuestionDialog, setEditQuestionDialog] = useState({
+  open: false,
+  questionId: null,
+  currentTitle: '',
+  currentQuestionText: '',
+  currentAnswers: ['', '', '', ''],
+  currentCorrectAnswerIndex: 0,
+  currentVersion: 1,
+  title: '',
+  questionText: '',
+  answers: ['', '', '', ''],
+  correctAnswerIndex: 0,
+  loading: false,
+  error: ''
+});
+
+const [deleteQuestionDialog, setDeleteQuestionDialog] = useState({
+  open: false,
+  questionId: null,
+  questionTitle: '',
+  loading: false,
+  error: ''
+});
+// Состояние для просмотра пользователей, прошедших тест
+const [testUsersDialog, setTestUsersDialog] = useState({
+  open: false,
+  testId: null,
+  testName: '',
+  disciplineId: null,
+  disciplineName: '',
+  users: [], 
+  loading: false,
+  error: ''
+});
+
+// Состояние для детального просмотра попытки пользователя
+const [userAttemptDialog, setUserAttemptDialog] = useState({
+  open: false,
+  userId: null,
+  userName: '',
+  testId: null,
+  testName: '',
+  attempts: [], // Все попытки пользователя по этому тесту
+  selectedAttempt: null, // Выбранная попытка для просмотра ответов
+  answers: [], // Ответы пользователя в выбранной попытке
+  loading: false,
+  error: ''
+});
+
+// Состояние для фильтрации и поиска
+const [searchTerm, setSearchTerm] = useState('');
+    
+    // Загружаем все доступные вопросы
+    fetchAllQuestions();
+  };
+
+
+
+// Обработчик для начала теста
+const handleStartTestClick = async (test, disciplineName = '', disciplineId = null) => {
+  const actualDisciplineId = disciplineId || disciplineTestsDialog.disciplineId;
+  
+  if (!actualDisciplineId) {
+    showSnackbar('Ошибка: не указан ID дисциплины', 'error');
+    return;
+  }
+  
+  setStartTestDialog({
+    open: true,
+    testId: test.id,
+    testName: test.name || 'Без названия',
+    disciplineName: disciplineName || test.discipline_name || '',
+    disciplineId: actualDisciplineId,
+    attemptId: null,
+    questions: [],
+    currentQuestionIndex: 0,
+    userAnswers: {},
+    loading: true,
+    error: ''
+  });
+  
+  try {
+
+    const testData = await initializeTest(userId, test.id);
+    
+    // 2. Проверяем структуру данных
+    if (!testData.attempt_id) {
+      throw new Error('Не получен ID попытки теста');
+    }
+    
+    // 3. Проверяем формат вопросов
+    let formattedQuestions = [];
+    
+    if (testData.questions && Array.isArray(testData.questions)) {
+      // Если вопросы пришли в нужном формате
+      formattedQuestions = testData.questions.map((question, index) => ({
+        ...question,
+        position: question.position || index + 1
+      }));
+    } else {
+      // Если вопросы пришли в другом формате, адаптируем их
+      console.warn('Вопросы пришли в неожиданном формате, производим адаптацию:', testData);
+      
+      // Попробуем адаптировать разные форматы
+      if (testData.questions) {
+        formattedQuestions = Object.values(testData.questions).map((q, index) => ({
+          id: q.id || index,
+          title: q.title || `Вопрос ${index + 1}`,
+          text: q.text || q.question_text || q.name || '',
+          position: q.position || index + 1,
+          options: (q.options || q.answers || []).map((opt, optIndex) => ({
+            id: opt.id || optIndex,
+            text: opt.text || opt.answer_text || opt || ''
+          }))
+        }));
+      }
+    }
+    
+    if (formattedQuestions.length === 0) {
+      throw new Error('В тесте нет вопросов');
+    }
+    
+    // 4. Обновляем состояние с полученными данными
+    setStartTestDialog(prev => ({
+      ...prev,
+      attemptId: testData.attempt_id,
+      questions: formattedQuestions,
+      loading: false
+    }));
+    
+  } catch (err) {
+    console.error('Ошибка начала теста:', err);
+    setStartTestDialog(prev => ({ 
+      ...prev, 
+      error: err.message,
+      loading: false
+    }));
+    showSnackbar(`Ошибка начала теста: ${err.message}`, 'error');
+  }
+};
+
+const fetchTestMarks = async (disciplineId, testId) => {
+  const url = `${API_BASE_URL}/disciplines/${disciplineId}/tests/${testId}/passers/marks`;
+
+  const response = await fetch(url, { method: "GET" });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `HTTP ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+};
+
+
+
+
+const [testMarksDialog, setTestMarksDialog] = useState({
+  open: false,
+  disciplineId: null,
+  disciplineName: "",
+  testId: null,
+  testName: "",
+  marks: [],
+  loading: false,
+  error: null,
+});
+
+const handleViewTestMarksClick = async (test, discipline) => {
+  setTestMarksDialog(prev => ({
+    ...prev,
+    open: true,
+    disciplineId: discipline.id,
+    disciplineName: discipline.name,
+    testId: test.id,
+    testName: test.name,
+    marks: [],
+    loading: true,
+    error: null,
+  }));
+
+  try {
+    const marks = await fetchTestMarks(discipline.id, test.id);
+    setTestMarksDialog(prev => ({ ...prev, marks, loading: false }));
+  } catch (err) {
+    setTestMarksDialog(prev => ({ ...prev, error: err.message, loading: false }));
+    showSnackbar(err.message, "error");
+  }
+};
+
+const handleCloseTestMarksDialog = () => {
+  setTestMarksDialog({
+    open: false,
+    disciplineId: null,
+    disciplineName: "",
+    testId: null,
+    testName: "",
+    marks: [],
+    loading: false,
+    error: null,
+  });
+};
+
+
+
+// Обработчик для завершения теста
+const handleSubmitTest = async () => {
+  try {
+    setStartTestDialog(prev => ({ ...prev, loading: true }));
+    
+    if (!startTestDialog.attemptId) {
+      throw new Error('Не удалось определить ID попытки теста');
+    }
+    
+    
+    const unansweredQuestions = startTestDialog.questions.filter((_, index) => 
+      startTestDialog.userAnswers[index] === undefined
+    );
+    
+    if (unansweredQuestions.length > 0) {
+      const confirmResult = window.confirm(
+        `У вас есть ${unansweredQuestions.length} неотвеченных вопросов. Все равно завершить тест?`
+      );
+      if (!confirmResult) {
+        setStartTestDialog(prev => ({ ...prev, loading: false }));
+        return;
+      }
+    }
+    
+    // Подготавливаем ответы для отправки
+    const answers = Object.entries(startTestDialog.userAnswers).map(([questionIndex, answerIndex]) => {
+      const question = startTestDialog.questions[questionIndex];
+      const selectedOption = question.options[answerIndex];
+      
+      return {
+        question_id: question.id,
+        answer_option_id: selectedOption.id 
+      };
+    });
+    
+    // Отправляем ответы на сервер для завершения попытки
+    const result = await completeTestAttempt(
+      userId,
+      startTestDialog.attemptId,
+      answers
+    );
+    
+    // Показываем результат
+    showSnackbar(`Тест завершен! Ваш результат: ${result.score || 0} баллов`, 'success');
+    
+    // Открываем диалог с результатами
+    setViewAttemptDialog({
+      open: true,
+      attemptId: startTestDialog.attemptId,
+      userId: userId,
+      userName: userName,
+      testName: startTestDialog.testName,
+      questions: startTestDialog.questions.map((q, index) => ({
+        id: q.id,
+        question_text: q.text || `Вопрос ${index + 1}`,
+        user_answer: startTestDialog.userAnswers[index] !== undefined ? 
+          `Ответ ${startTestDialog.userAnswers[index] + 1}` : 'Не отвечен',
+        is_correct: true, // Нужно получать с сервера
+        correct_answer: 'Правильный ответ' // Нужно получать с сервера
+      })),
+      userAnswers: startTestDialog.userAnswers,
+      score: result.score || 0,
+      status: 'completed',
+      loading: false,
+      error: ''
+    });
+    
+    // Закрываем диалог начала теста
+    handleCloseStartTestDialog();
+    
+  } catch (err) {
+    console.error('Ошибка отправки теста:', err);
+    setStartTestDialog(prev => ({ 
+      ...prev, 
+      error: err.message,
+      loading: false
+    }));
+    showSnackbar(`Ошибка отправки теста: ${err.message}`, 'error');
+  }
+};
+// Закрытие диалога начала теста
+const handleCloseStartTestDialog = () => {
+  setStartTestDialog({
+    open: false,
+    testId: null,
+    testName: '',
+    disciplineName: '',
+    questions: [],
+    currentQuestionIndex: 0,
+    userAnswers: {},
+    loading: false,
+    error: ''
+  });
+};
+
+// Обработчик для выбора ответа
+const handleAnswerSelect = (questionIndex, answerIndex) => {
+  setStartTestDialog(prev => ({
+    ...prev,
+    userAnswers: {
+      ...prev.userAnswers,
+      [questionIndex]: answerIndex
+    }
+  }));
+};
+
+
+// Переход к следующему вопросу
+const handleNextQuestion = () => {
+  if (startTestDialog.currentQuestionIndex < startTestDialog.questions.length - 1) {
+    setStartTestDialog(prev => ({
+      ...prev,
+      currentQuestionIndex: prev.currentQuestionIndex + 1
+    }));
+  }
+};
+
+// Переход к предыдущему вопросу
+const handlePreviousQuestion = () => {
+  if (startTestDialog.currentQuestionIndex > 0) {
+    setStartTestDialog(prev => ({
+      ...prev,
+      currentQuestionIndex: prev.currentQuestionIndex - 1
+    }));
+  }
+};
+
+  // Обработчик для добавления существующего вопроса в тест
+  const handleSaveAddQuestionToTest = async () => {
+    if (!addQuestionToTestDialog.selectedQuestionId) {
+      showSnackbar('Выберите вопрос для добавления', 'warning');
+      return;
+    }
+    
+    try {
+      await addQuestionToTest(
+        addQuestionToTestDialog.testId,
+        addQuestionToTestDialog.selectedQuestionId
+      );
+      handleCloseAddQuestionToTestDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Обработчики меню вопросов
+  const handleQuestionMenuOpen = (event, question) => {
+    setQuestionMenuAnchor(event.currentTarget);
+    setSelectedQuestionForMenu(question);
+  };
+
+  const handleQuestionMenuClose = () => {
+    setQuestionMenuAnchor(null);
+    setSelectedQuestionForMenu(null);
+  };
+
+  const handleQuestionMenuAction = (action) => {
+    if (selectedQuestionForMenu) {
+      switch (action) {
+        case 'edit':
+          handleEditQuestionClick(selectedQuestionForMenu);
+          break;
+        case 'delete':
+          handleDeleteQuestionClick(selectedQuestionForMenu);
+          break;
+      }
+    }
+    handleQuestionMenuClose();
+  };
+
+  // Обработчик для сохранения нового вопроса
+  const handleSaveCreateQuestion = async () => {
+    if (!createQuestionDialog.title.trim()) {
+      showSnackbar('Название вопроса не может быть пустым', 'warning');
+      return;
+    }
+    
+    if (!createQuestionDialog.questionText.trim()) {
+      showSnackbar('Текст вопроса не может быть пустым', 'warning');
+      return;
+    }
+    
+    // Проверяем, что есть хотя бы 2 варианта ответа
+    const nonEmptyAnswers = createQuestionDialog.answers.filter(answer => answer.trim() !== '');
+    if (nonEmptyAnswers.length < 2) {
+      showSnackbar('Необходимо указать хотя бы 2 варианта ответа', 'warning');
+      return;
+    }
+    
+    // Проверяем, что выбранный правильный ответ не пустой
+    if (!createQuestionDialog.answers[createQuestionDialog.correctAnswerIndex]?.trim()) {
+      showSnackbar('Правильный ответ не может быть пустым', 'warning');
+      return;
+    }
+    
+    try {
+      await createQuestion(createQuestionDialog.testId, {
+        title: createQuestionDialog.title.trim(),
+        questionText: createQuestionDialog.questionText.trim(),
+        answers: createQuestionDialog.answers,
+        correctAnswerIndex: createQuestionDialog.correctAnswerIndex
+      });
+      handleCloseCreateQuestionDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Обработчик для сохранения изменений вопроса
+  const handleSaveEditQuestion = async () => {
+    if (!editQuestionDialog.title.trim()) {
+      showSnackbar('Название вопроса не может быть пустым', 'warning');
+      return;
+    }
+    
+    if (!editQuestionDialog.questionText.trim()) {
+      showSnackbar('Текст вопроса не может быть пустым', 'warning');
+      return;
+    }
+    
+    // Проверяем, что есть хотя бы 2 варианта ответа
+    const nonEmptyAnswers = editQuestionDialog.answers.filter(answer => answer.trim() !== '');
+    if (nonEmptyAnswers.length < 2) {
+      showSnackbar('Необходимо указать хотя бы 2 варианта ответа', 'warning');
+      return;
+    }
+    
+    // Проверяем, что выбранный правильный ответ не пустой
+    if (!editQuestionDialog.answers[editQuestionDialog.correctAnswerIndex]?.trim()) {
+      showSnackbar('Правильный ответ не может быть пустым', 'warning');
+      return;
+    }
+    
+    try {
+      await updateQuestion(editQuestionDialog.questionId, {
+        title: editQuestionDialog.title.trim(),
+        questionText: editQuestionDialog.questionText.trim(),
+        answers: editQuestionDialog.answers,
+        correctAnswerIndex: editQuestionDialog.correctAnswerIndex,
+        currentVersion: editQuestionDialog.currentVersion
+      });
+      handleCloseEditQuestionDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
+  };
+
+  // Обработчик для подтверждения удаления вопроса
+  const handleConfirmDeleteQuestion = async () => {
+    try {
+      await deleteQuestion(deleteQuestionDialog.questionId);
+      handleCloseDeleteQuestionDialog();
+    } catch (err) {
+      // Ошибка уже обработана
+    }
   };
 
   // Обработчики для мягкого удаления дисциплины
@@ -1671,7 +3216,6 @@ function PersonalAccount() {
       });
       handleCloseAddTestDialog();
     } catch (err) {
-      // Ошибка уже обработана
     }
   };
 
@@ -1684,8 +3228,82 @@ function PersonalAccount() {
       );
       handleCloseDeleteTestDialog();
     } catch (err) {
-      // Ошибка уже обработана
+    
     }
+  };
+
+  // Закрытие диалога вопросов
+  const handleCloseQuestionsDialog = () => {
+    setQuestionsDialog({
+      open: false,
+      testId: null,
+      testName: '',
+      disciplineName: '',
+      questions: [],
+      loading: false,
+      error: ''
+    });
+  };
+
+
+  const handleCloseCreateQuestionDialog = () => {
+    setCreateQuestionDialog({
+      open: false,
+      testId: null,
+      testName: '',
+      title: '',
+      questionText: '',
+      answers: ['', '', '', ''],
+      correctAnswerIndex: 0,
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога редактирования вопроса
+  const handleCloseEditQuestionDialog = () => {
+    setEditQuestionDialog({
+      open: false,
+      questionId: null,
+      currentTitle: '',
+      currentQuestionText: '',
+      currentAnswers: ['', '', '', ''],
+      currentCorrectAnswerIndex: 0,
+      currentVersion: 1,
+      title: '',
+      questionText: '',
+      answers: ['', '', '', ''],
+      correctAnswerIndex: 0,
+      loading: false,
+      error: ''
+    });
+  };
+
+  // Закрытие диалога удаления вопроса
+  const handleCloseDeleteQuestionDialog = () => {
+    setDeleteQuestionDialog({
+      open: false,
+      questionId: null,
+      questionTitle: '',
+      loading: false,
+      error: ''
+    });
+  };
+
+
+  // Закрытие диалога добавления вопроса в тест
+  const handleCloseAddQuestionToTestDialog = () => {
+    setAddQuestionToTestDialog({
+      open: false,
+      testId: null,
+      testName: '',
+      disciplineId: null,
+      disciplineName: '',
+      allQuestions: [],
+      selectedQuestionId: '',
+      loading: false,
+      error: ''
+    });
   };
 
   // Обработчики для пользователей
@@ -1877,7 +3495,7 @@ function PersonalAccount() {
     });
   };
 
-  // Закрытие диалога восстановления дисциплины
+  // Закрытие диалога восстановления дисциплина
   const handleCloseRestoreDisciplineDialog = () => {
     setRestoreDisciplineDialog({
       open: false,
@@ -1952,13 +3570,14 @@ function PersonalAccount() {
       return;
     }
     
-    try {
-      await updateUserRoles(editRolesData.id, editRolesData.newRoles);
-      handleCloseRolesDialog();
-    } catch (err) {
-      // Ошибка уже обработана
+try {
+    await updateUserRoles(editRolesData.id, editRolesData.newRoles);
+    if (editRolesData.id === userId) { 
+      await fetchUserProfile();  
     }
-  };
+    handleCloseRolesDialog();
+  } catch (err) { }
+};
 
   const handleConfirmBlock = async () => {
     try {
@@ -2012,40 +3631,41 @@ function PersonalAccount() {
     return blockStatuses[userId] || false;
   };
 
-  const getBlockStatusComponent = (userId) => {
-    const isBlocked = getBlockStatus(userId);
-    
-    if (isBlocked) {
-      return (
-        <Tooltip title="Пользователь заблокирован">
-          <Chip
-            icon={<BlockIcon />}
-            label="Заблокирован"
-            color="error"
-            size="small"
-            variant="outlined"
-          />
-        </Tooltip>
-      );
-    }
-    
+const getBlockStatusComponent = (userId) => {
+  const isBlocked = getBlockStatus(userId);
+
+  if (isBlocked) {
     return (
-      <Tooltip title="Пользователь активен">
+      <Tooltip title="Пользователь заблокирован">
         <Chip
-          icon={<CheckCircleIcon />}
-          label="Активен"
-          color="success"
+          icon={<BlockIcon />}
+          label="Заблокирован"
+          color="error"
           size="small"
           variant="outlined"
         />
       </Tooltip>
     );
-  };
+  }
 
-  // Проверка прав пользователя
+  return (
+    <Tooltip title="Пользователь активен">
+      <Chip
+        icon={<CheckCircleIcon />}
+        label="Активен"
+        color="success"
+        size="small"
+        variant="outlined"
+      />
+    </Tooltip>
+  );
+};
+
+
+
+ 
   const hasPermission = (permission) => {
-    // Здесь должна быть логика проверки прав пользователя
-    // Для демонстрации считаем, что у пользователя есть все права
+   
     return true;
   };
 
@@ -2068,26 +3688,28 @@ function PersonalAccount() {
   // Получение списка дисциплин с учетом фильтра
   const getFilteredDisciplines = () => {
     if (showDeleted) {
-      // Показываем все дисциплины, включая удаленные
+     
       return disciplines;
     } else {
-      // Показываем только активные дисциплины
+      
       return disciplines.filter(d => !d.deleted);
     }
   };
 
-  // Подсчет количества активных и удаленных дисциплин
+
   const getDisciplineStats = () => {
     const active = disciplines.filter(d => !d.deleted).length;
     const deleted = disciplines.filter(d => d.deleted).length;
     return { active, deleted };
   };
 
-  // Загрузка данных при переключении вкладок
+
   useEffect(() => {
     if (activeTab === 'Участники') {
       fetchUsers();
     } else if (activeTab === 'Дисциплина') {
+      fetchDisciplines();
+    } else if (activeTab === 'Тест') {
       fetchDisciplines();
     }
   }, [activeTab]);
@@ -2137,7 +3759,7 @@ function PersonalAccount() {
 
         <Box component="main" sx={{ flexGrow: 1, bgcolor: 'background.default', p: 3, minHeight: '100vh' }}>
           
-          {/* ВКЛАДКА ПРОФИЛЬ */}
+          
           {activeTab === 'Профиль' && (
             <Paper sx={{ p: 3, maxWidth: 800 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -2154,6 +3776,13 @@ function PersonalAccount() {
                   >
                     Редактировать ФИО
                   </Button>
+                  <Button
+    variant="outlined"
+    color="error"
+    onClick={() => (window.location.href = "/logout")}
+  >
+    Выход
+  </Button>
                 </Box>
               </Box>
               
@@ -2189,25 +3818,6 @@ function PersonalAccount() {
                       <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
                         ID: {userId}
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                        {userRoles.length > 0 ? (
-                          userRoles.map((role, index) => {
-                            const RoleIcon = getRoleIcon(role);
-                            return (
-                              <Chip
-                                key={index}
-                                label={role}
-                                icon={RoleIcon}
-                                size="small"
-                                color={getRoleChipColor(role)}
-                                variant="outlined"
-                              />
-                            );
-                          })
-                        ) : (
-                          <Chip label="Без ролей" size="small" color="default" />
-                        )}
-                      </Box>
                     </Box>
                   </Box>
                   
@@ -2226,25 +3836,25 @@ function PersonalAccount() {
           {activeTab === 'Дисциплина' && (
             <Paper sx={{ p: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-  <Typography variant="h5">Список дисциплин</Typography>
-  <Box sx={{ display: 'flex', gap: 1 }}>
-    <Button 
-      variant="outlined" 
-      onClick={fetchDisciplines}
-      disabled={disciplinesLoading}
-      startIcon={disciplinesLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
-    >
-      Обновить
-    </Button>
-    <Button 
-      variant="contained" 
-      startIcon={<AddIcon />}
-      onClick={handleCreateDisciplineClick}
-    >
-      Создать дисциплину
-    </Button>
-  </Box>
-</Box>
+                <Typography variant="h5">Список дисциплин</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button 
+                    variant="outlined" 
+                    onClick={fetchDisciplines}
+                    disabled={disciplinesLoading}
+                    startIcon={disciplinesLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+                  >
+                    Обновить
+                  </Button>
+                  <Button 
+                    variant="contained" 
+                    startIcon={<AddIcon />}
+                    onClick={handleCreateDisciplineClick}
+                  >
+                    Создать дисциплину
+                  </Button>
+                </Box>
+              </Box>
               {disciplinesLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
                   <CircularProgress />
@@ -2438,6 +4048,185 @@ function PersonalAccount() {
             </Paper>
           )}
 
+          {/* ВКЛАДКА ТЕСТ */}
+          {activeTab === 'Тест' && (
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5">Управление тестами и вопросами</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button 
+                    variant="outlined" 
+                    onClick={fetchDisciplines}
+                    disabled={disciplinesLoading}
+                    startIcon={disciplinesLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+                  >
+                    Обновить
+                  </Button>
+                </Box>
+              </Box>
+              
+              {disciplinesLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                  <CircularProgress />
+                  <Typography sx={{ ml: 2 }}>Загрузка дисциплин...</Typography>
+                </Box>
+              ) : error ? (
+                <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+                  <Typography>Ошибка: {error}</Typography>
+                  <Button size="small" onClick={fetchDisciplines} sx={{ mt: 1 }}>
+                    Попробовать снова
+                  </Button>
+                </Box>
+              ) : disciplines.length > 0 ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {disciplines.map((discipline) => (
+                    <Accordion key={discipline.id}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                          <Avatar sx={{ bgcolor: 'primary.main' }}>
+                            <SchoolIcon />
+                          </Avatar>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="h6">{discipline.name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              ID: {discipline.id} • {discipline.description || 'Без описания'}
+                            </Typography>
+                          </Box>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<QuizIcon />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDisciplineTests(discipline);
+                            }}
+                          >
+                            Тесты дисциплины
+                          </Button>
+                        </Box>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Box sx={{ pl: 7, pr: 2 }}>
+                          {disciplineTestsDialog.loading && disciplineTestsDialog.disciplineId === discipline.id ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                              <CircularProgress size={24} />
+                              <Typography sx={{ ml: 2 }}>Загрузка тестов...</Typography>
+                            </Box>
+                          ) : disciplineTestsDialog.tests.length > 0 && disciplineTestsDialog.disciplineId === discipline.id ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                                Тесты дисциплины "{discipline.name}":
+                              </Typography>
+                              <Grid container spacing={2}>
+                                {disciplineTestsDialog.tests.map((test) => (
+                                  <Grid item xs={12} md={6} lg={4} key={test.id}>
+                                    <Card sx={{ height: '100%' }}>
+                                      <CardContent>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                                          <Box>
+                                            <Typography variant="h6">{test.name || 'Без названия'}</Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                              ID: {test.id}
+                                            </Typography>
+                                          </Box>
+                                          <Chip
+                                            label={getTestStatus(test)}
+                                            color={getTestStatusColor(test)}
+                                            size="small"
+                                            variant="outlined"
+                                          />
+                                        </Box>
+                                        
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                          {test.description || 'Описание отсутствует'}
+                                        </Typography>
+                                        
+                                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                          <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<QuestionAnswerIcon />}
+                                            onClick={() => handleViewTestQuestions(
+                                              test, 
+                                              discipline.name,
+                                              discipline.id
+                                            )}
+                                          >
+                                            Вопросы теста
+                                          </Button>
+                                          <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<CheckCircleIcon />}
+                                            onClick={() => handleCheckTestState(discipline, test)}
+                                          >
+                                            Проверить активность
+                                          </Button>
+                                          <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={test.state === 'active' ? <PauseCircleOutlineIcon /> : <PlayCircleOutlineIcon />}
+                                            onClick={() => handleActivateTestClick(discipline, test)}
+                                          >
+                                            {test.state === 'active' ? 'Деактивировать' : 'Активировать'}
+                                          </Button>
+                                        </Box>
+                                      </CardContent>
+                                    </Card>
+                                  </Grid>
+                                ))}
+                              </Grid>
+                            </Box>
+                          ) : (
+                            <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                              <QuizIcon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+                              <Typography variant="h6" sx={{ mb: 1 }}>
+                                Тесты не загружены
+                              </Typography>
+                              <Typography variant="body2" sx={{ mb: 3 }}>
+                                Нажмите кнопку "Тесты дисциплины" для загрузки тестов
+                              </Typography>
+                              <Button
+                                variant="contained"
+                                startIcon={<QuizIcon />}
+                                onClick={() => handleViewDisciplineTests(discipline)}
+                              >
+                                Загрузить тесты
+                              </Button>
+                            </Box>
+                          )}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+              ) : (
+                <Box sx={{ 
+                  textAlign: 'center', 
+                  py: 8, 
+                  color: 'text.secondary',
+                  border: '2px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 2
+                }}>
+                  <SchoolIcon sx={{ fontSize: 60, mb: 2, opacity: 0.5 }} />
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    Дисциплины не найдены
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 3 }}>
+                    В системе пока нет зарегистрированных дисциплин
+                  </Typography>
+                  <Button 
+                    variant="outlined"
+                    onClick={fetchDisciplines}
+                  >
+                    Обновить список
+                  </Button>
+                </Box>
+              )}
+            </Paper>
+          )}
+
           {/* ВКЛАДКА УЧАСТНИКИ */}
           {activeTab === 'Участники' && (
             <Paper sx={{ p: 3 }}>
@@ -2472,9 +4261,7 @@ function PersonalAccount() {
                       <TableRow>
                         <TableCell>ID</TableCell>
                         <TableCell>ФИО</TableCell>
-                        <TableCell>Email</TableCell>
                         <TableCell>Статус</TableCell>
-                        <TableCell>Роли</TableCell>
                         <TableCell>Действия</TableCell>
                       </TableRow>
                     </TableHead>
@@ -2503,31 +4290,10 @@ function PersonalAccount() {
                                 )}
                               </Box>
                             </TableCell>
-                            <TableCell>{user.email || user.mail || '—'}</TableCell>
                             <TableCell>
                               {getBlockStatusComponent(user.id)}
                             </TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                {user.roles && user.roles.length > 0 ? (
-                                  user.roles.map((role, index) => {
-                                    const RoleIcon = getRoleIcon(role);
-                                    return (
-                                      <Chip
-                                        key={index}
-                                        label={role}
-                                        icon={RoleIcon}
-                                        size="small"
-                                        color={getRoleChipColor(role)}
-                                        variant="outlined"
-                                      />
-                                    );
-                                  })
-                                ) : (
-                                  <Chip label="Без ролей" size="small" color="default" />
-                                )}
-                              </Box>
-                            </TableCell>
+                        
                             <TableCell>
                               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                                 <Button
@@ -2588,16 +4354,7 @@ function PersonalAccount() {
             </Paper>
           )}
 
-          {/* ОСТАЛЬНЫЕ ВКЛАДКИ */}
-          {activeTab === 'Тест' && (
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="h5" sx={{ mb: 3 }}>Тесты</Typography>
-              <Typography variant="body1">
-                Функционал тестов будет реализован позже...
-              </Typography>
-            </Paper>
-          )}
-
+          {/* ВКЛАДКА ПРЕПОДАВАТЕЛЬ */}
           {activeTab === 'Преподаватель' && (
             <Paper sx={{ p: 3 }}>
               <Typography variant="h5" sx={{ mb: 3 }}>Преподаватели</Typography>
@@ -3119,24 +4876,27 @@ function PersonalAccount() {
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddStudentDialog} disabled={disciplineStudentsDialog.addStudentDialog.loading}>
-            Отмена
-          </Button>
-          <Button
-            onClick={handleAddStudentToDiscipline}
-            variant="contained"
-            color="success"
-            disabled={disciplineStudentsDialog.addStudentDialog.loading || !disciplineStudentsDialog.addStudentDialog.studentId}
-            startIcon={<PersonAddIcon />}
-          >
-            {disciplineStudentsDialog.addStudentDialog.loading ? (
-              <CircularProgress size={20} />
-            ) : (
-              'Записать студента'
-            )}
-          </Button>
-        </DialogActions>
+<DialogActions>
+  <Button onClick={handleCloseAddStudentDialog} disabled={disciplineStudentsDialog.addStudentDialog.loading}>
+    Отмена
+  </Button>
+  <Button
+    onClick={handleAddStudentToDiscipline}
+    variant="contained"
+    color="success"
+    disabled={
+      disciplineStudentsDialog.addStudentDialog.loading ||
+      !disciplineStudentsDialog.addStudentDialog.studentId
+    }
+    startIcon={<PersonAddIcon />}
+  >
+    {disciplineStudentsDialog.addStudentDialog.loading ? (
+      <CircularProgress size={20} />
+    ) : (
+      'Записать'
+    )}
+  </Button>
+</DialogActions>
       </Dialog>
 
       {/* ДИАЛОГ ТЕСТОВ ДИСЦИПЛИНЫ */}
@@ -3227,7 +4987,17 @@ function PersonalAccount() {
                           new Date(test.created_at).toLocaleDateString() : '—'}
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          <Tooltip title="Посмотреть вопросы">
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<QuestionAnswerIcon />}
+                              onClick={() => handleViewTestQuestions(test, disciplineTestsDialog.disciplineName)}
+                            >
+                              Вопросы
+                            </Button>
+                          </Tooltip>
                           <Tooltip title="Проверить активность">
                             <Button
                               variant="outlined"
@@ -3243,6 +5013,38 @@ function PersonalAccount() {
                             >
                               Проверить
                             </Button>
+                          </Tooltip>
+                          <Tooltip title="Начать тест">
+                            <Button
+                              variant="contained"
+                              color="success"
+                              startIcon={<PlayCircleOutlineIcon />}
+                              onClick={() => {
+                              
+                                const testObj = {
+                                  id: test.id, 
+                                  name: test.name,
+                                  discipline_name: disciplineTestsDialog.disciplineName
+                                };
+                                handleStartTestClick(
+                                  testObj, 
+                                  disciplineTestsDialog.disciplineName, 
+                                  disciplineTestsDialog.disciplineId
+                                );
+                                handleCloseTestsDialog();
+                              }}
+                            >
+                              Начать тест
+                            </Button>
+                          </Tooltip>
+                                                  <Tooltip title="Просмотреть пользователей, прошедших тест">
+                          <Button
+                            variant="outlined"
+                            onClick={() => handleViewTestMarksClick(test, { id: disciplineTestsDialog.disciplineId, name: disciplineTestsDialog.disciplineName })}
+                          >
+                            РЕЗУЛЬТАТЫ ТЕСТА
+                          </Button>
+
                           </Tooltip>
                           <Tooltip title="Дополнительные действия">
                             <IconButton
@@ -3290,6 +5092,1052 @@ function PersonalAccount() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseTestsDialog}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ ВОПРОСОВ ТЕСТА */}
+      <Dialog 
+        open={questionsDialog.open} 
+        onClose={handleCloseQuestionsDialog} 
+        maxWidth="lg" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <QuestionAnswerIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Список вопросов теста
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Тест: {questionsDialog.testName} • Дисциплина: {questionsDialog.disciplineName}
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Tooltip title="Добавить вопрос">
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleCreateQuestionClick}
+                >
+                  Добавить вопрос
+                </Button>
+              </Tooltip>
+              <Tooltip title="Добавить существующий вопрос">
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={handleAddQuestionToTestClick}
+                >
+                  Добавить существующий вопрос
+                </Button>
+              </Tooltip>
+              <IconButton onClick={handleCloseQuestionsDialog} size="small">
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {questionsDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Загрузка вопросов...</Typography>
+            </Box>
+          ) : questionsDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {questionsDialog.error}</Typography>
+            </Box>
+          ) : questionsDialog.questions.length > 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Информация о тесте
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {questionsDialog.disciplineName}
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Тест:</strong> {questionsDialog.testName}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>ID теста:</strong> {questionsDialog.testId}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>Всего вопросов:</strong> {questionsDialog.questions.length}
+                    </Typography>
+                   
+                      <Tooltip title="Изменить порядок вопросов">
+                        <Button
+                          variant="outlined"
+                          startIcon={<FormatListBulletedIcon />}
+                          onClick={handleReorderQuestionsClick}
+                        >
+                          Порядок вопросов
+                        </Button>
+                      </Tooltip>
+
+                      <Tooltip title="Просмотреть пользователей, прошедших тест">
+                        <Button
+                          variant="outlined"
+                          startIcon={<PeopleIcon />}
+                          onClick={handleViewTestUsersClick}
+                        >
+                          Результаты теста
+                        </Button>
+                      </Tooltip>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Список вопросов (показаны только последние версии)
+                </Typography>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell width="40%">Название вопроса</TableCell>
+                        <TableCell>Версия</TableCell>
+                        <TableCell>ID автора</TableCell>
+                        <TableCell>Действия</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {questionsDialog.questions.map((question, index) => (
+                        <TableRow key={question.id || index} hover>
+                          <TableCell>
+                            <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                              {question.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                              {question.rawQuestion?.question_text || question.rawQuestion?.text || ''}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={`v${question.version}`}
+                              color="primary"
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {question.authorId || 'Не указан'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<InfoIcon />}
+                                onClick={() => {
+                                  // Здесь можно добавить функционал для просмотра деталей вопроса
+                                  showSnackbar(`Детали вопроса: ${question.name} (версия ${question.version})`, 'info');
+                                }}
+                              >
+                                Подробнее
+                              </Button>
+                              <Tooltip title="Дополнительные действия">
+                                <IconButton
+                                  size="small"
+                                  onClick={(event) => handleQuestionMenuOpen(event, question)}
+                                >
+                                  <MoreVertIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Информация
+                </Typography>
+                <Typography variant="body2">
+                  • Показаны только последние версии каждого вопроса<br />
+                  • Если у вопроса несколько версий, отображается самая новая<br />
+                  • ID автора указывает на пользователя, который создал или обновил вопрос<br />
+                  • Для редактирования вопроса нажмите на кнопку с тремя точками
+                </Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
+              <QuestionAnswerIcon sx={{ fontSize: 60, mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" sx={{ mb: 1 }}>
+                Вопросы не найдены
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 3 }}>
+                В этом тесте пока нет созданных вопросов
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                <Button 
+                  variant="contained" 
+                  startIcon={<AddIcon />}
+                  onClick={handleCreateQuestionClick}
+                >
+                  Добавить первый вопрос
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  startIcon={<AddIcon />}
+                  onClick={handleAddQuestionToTestClick}
+                >
+                  Добавить существующий вопрос
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseQuestionsDialog}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ ПРОХОЖДЕНИЯ ТЕСТА */}
+<Dialog 
+  open={startTestDialog.open} 
+  onClose={handleCloseStartTestDialog} 
+  maxWidth="md" 
+  fullWidth
+  fullScreen={true}
+>
+  <DialogTitle>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Avatar sx={{ bgcolor: 'primary.main' }}>
+          <QuizIcon />
+        </Avatar>
+        <Box>
+          <Typography variant="h6">
+            Прохождение теста: {startTestDialog.testName}
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+  Дисциплина: {startTestDialog.disciplineName} • 
+  Вопрос {startTestDialog.currentQuestionIndex + 1} из {startTestDialog.questions.length}
+  {startTestDialog.attemptId && ` • ID попытки: ${startTestDialog.attemptId}`}
+</Typography>
+        </Box>
+      </Box>
+      <IconButton onClick={handleCloseStartTestDialog} size="small">
+        <CloseIcon />
+      </IconButton>
+    </Box>
+  </DialogTitle>
+  
+  <DialogContent dividers>
+    {startTestDialog.loading ? (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <CircularProgress />
+        <Typography sx={{ ml: 2 }}>Загрузка теста...</Typography>
+      </Box>
+    ) : startTestDialog.error ? (
+      <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+        <Typography>Ошибка: {startTestDialog.error}</Typography>
+        <Button onClick={handleCloseStartTestDialog} sx={{ mt: 1 }}>
+          Закрыть
+        </Button>
+      </Box>
+    ) : startTestDialog.questions.length > 0 ? (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+        {/* Прогресс-бар */}
+        <Box sx={{ mb: 3 }}>
+          <LinearProgress 
+            variant="determinate" 
+            value={(startTestDialog.currentQuestionIndex + 1) / startTestDialog.questions.length * 100} 
+            sx={{ height: 8, borderRadius: 4 }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+            <Typography variant="body2" color="textSecondary">
+              Прогресс: {Math.round((startTestDialog.currentQuestionIndex + 1) / startTestDialog.questions.length * 100)}%
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Отвечено: {Object.keys(startTestDialog.userAnswers).length} из {startTestDialog.questions.length}
+            </Typography>
+          </Box>
+        </Box>
+        
+        {/* Текущий вопрос */}
+
+{startTestDialog.questions[startTestDialog.currentQuestionIndex] && (
+  <Box sx={{ mb: 4 }}>
+    <Typography variant="h6" sx={{ mb: 3, color: 'primary.main' }}>
+      Вопрос {startTestDialog.currentQuestionIndex + 1}: {startTestDialog.questions[startTestDialog.currentQuestionIndex].title}
+    </Typography>
+    
+    <Typography variant="body1" sx={{ mb: 4, lineHeight: 1.6 }}>
+      {startTestDialog.questions[startTestDialog.currentQuestionIndex].text}
+    </Typography>
+    
+    {/* Варианты ответов */}
+    <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+      Выберите правильный ответ:
+    </Typography>
+    <RadioGroup
+      value={startTestDialog.userAnswers[startTestDialog.currentQuestionIndex] || ''}
+      onChange={(e) => handleAnswerSelect(startTestDialog.currentQuestionIndex, parseInt(e.target.value))}
+    >
+      {startTestDialog.questions[startTestDialog.currentQuestionIndex].options?.map((option, index) => (
+        <FormControlLabel
+          key={option.id || index}
+          value={index.toString()}
+          control={<Radio />}
+          label={
+            <Box sx={{ 
+              p: 2, 
+              borderRadius: 1, 
+              border: '1px solid',
+              borderColor: startTestDialog.userAnswers[startTestDialog.currentQuestionIndex] === index ? 'primary.main' : 'divider',
+              bgcolor: startTestDialog.userAnswers[startTestDialog.currentQuestionIndex] === index ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+              width: '100%',
+              ml: 1
+            }}>
+              <Typography variant="body1">
+                {option.text}
+              </Typography>
+            </Box>
+          }
+          sx={{ 
+            width: '100%',
+            ml: 0,
+            mb: 2,
+            '& .MuiFormControlLabel-label': { width: '100%' }
+          }}
+        />
+      ))}
+    </RadioGroup>
+  </Box>
+)}
+        
+        {/* Панель навигации */}
+        <Box sx={{ 
+          position: 'sticky', 
+          bottom: 0, 
+          bgcolor: 'background.paper', 
+          pt: 2, 
+          pb: 1,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          mt: 2
+        }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Button
+              variant="outlined"
+              onClick={handlePreviousQuestion}
+              disabled={startTestDialog.currentQuestionIndex === 0}
+              startIcon={<ChevronLeftIcon />}
+            >
+              Предыдущий вопрос
+            </Button>
+            
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {/* Индикатор ответов на вопросы */}
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                {startTestDialog.questions.map((_, index) => (
+                  <Tooltip key={index} title={`Вопрос ${index + 1}`}>
+                    <Box
+                      sx={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        bgcolor: startTestDialog.userAnswers[index] !== undefined ? 
+                          (startTestDialog.currentQuestionIndex === index ? 'primary.main' : 'success.main') : 
+                          (startTestDialog.currentQuestionIndex === index ? 'warning.main' : 'grey.500'),
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => setStartTestDialog(prev => ({
+                        ...prev,
+                        currentQuestionIndex: index
+                      }))}
+                    />
+                  </Tooltip>
+                ))}
+              </Box>
+            </Box>
+            
+{startTestDialog.currentQuestionIndex === startTestDialog.questions.length - 1 ? (
+  <Button
+    variant="contained"
+    color="success"
+    onClick={handleSubmitTest}
+    disabled={startTestDialog.loading}
+    endIcon={<SendIcon />}
+    sx={{ ml: 2 }}
+  >
+    {startTestDialog.loading ? 'Отправка...' : 'Завершить тест'}
+  </Button>
+) : (
+  <Button
+    variant="contained"
+    onClick={handleNextQuestion}
+    endIcon={<ChevronRightIcon />}
+  >
+    Следующий вопрос
+  </Button>
+)}
+          </Box>
+        </Box>
+      </Box>
+    ) : (
+      <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
+        <QuizIcon sx={{ fontSize: 60, mb: 2, opacity: 0.5 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          Вопросы не загружены
+        </Typography>
+        <Button onClick={handleCloseStartTestDialog}>
+          Закрыть
+        </Button>
+      </Box>
+    )}
+  </DialogContent>
+
+</Dialog>
+
+<Dialog open={testMarksDialog.open} onClose={handleCloseTestMarksDialog} maxWidth="sm" fullWidth>
+  <DialogTitle>
+    {testMarksDialog.testName} — результаты
+  </DialogTitle>
+
+  <DialogContent dividers>
+    {testMarksDialog.loading && <CircularProgress />}
+    {testMarksDialog.error && (
+      <Typography sx={{ color: "error.main" }}>{testMarksDialog.error}</Typography>
+    )}
+
+    {!testMarksDialog.loading && !testMarksDialog.error && (
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>User ID</TableCell>
+              <TableCell>Mark</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {testMarksDialog.marks.map((row) => (
+              <TableRow key={row.user_id}>
+                <TableCell>{row.user_id}</TableCell>
+                <TableCell>{row.mark}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    )}
+  </DialogContent>
+
+  <DialogActions>
+    <Button onClick={handleCloseTestMarksDialog}>Закрыть</Button>
+  </DialogActions>
+</Dialog>
+
+      {/* ДИАЛОГ СОЗДАНИЯ ВОПРОСА */}
+      <Dialog 
+        open={createQuestionDialog.open} 
+        onClose={handleCloseCreateQuestionDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <AddIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Создание нового вопроса
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Тест: {createQuestionDialog.testName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseCreateQuestionDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {createQuestionDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Создание вопроса...</Typography>
+            </Box>
+          ) : createQuestionDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {createQuestionDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Название вопроса *
+                </Typography>
+                <TextField
+                  value={createQuestionDialog.title}
+                  onChange={(e) => setCreateQuestionDialog(prev => ({
+                    ...prev,
+                    title: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Введите название вопроса"
+                  size="small"
+                  autoFocus
+                  error={!createQuestionDialog.title.trim()}
+                  helperText={!createQuestionDialog.title.trim() ? "Название вопроса не может быть пустым" : ""}
+                />
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Текст вопроса *
+                </Typography>
+                <TextField
+                  value={createQuestionDialog.questionText}
+                  onChange={(e) => setCreateQuestionDialog(prev => ({
+                    ...prev,
+                    questionText: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Введите текст вопроса"
+                  size="small"
+                  multiline
+                  rows={4}
+                  error={!createQuestionDialog.questionText.trim()}
+                  helperText={!createQuestionDialog.questionText.trim() ? "Текст вопроса не может быть пустым" : ""}
+                />
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Варианты ответов (минимум 2) *
+                </Typography>
+                <Grid container spacing={2}>
+                  {createQuestionDialog.answers.map((answer, index) => (
+                    <Grid item xs={12} key={index}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Radio
+                          checked={createQuestionDialog.correctAnswerIndex === index}
+                          onChange={() => setCreateQuestionDialog(prev => ({
+                            ...prev,
+                            correctAnswerIndex: index
+                          }))}
+                          disabled={!answer.trim()}
+                        />
+                        <TextField
+                          value={answer}
+                          onChange={(e) => {
+                            const newAnswers = [...createQuestionDialog.answers];
+                            newAnswers[index] = e.target.value;
+                            setCreateQuestionDialog(prev => ({
+                              ...prev,
+                              answers: newAnswers
+                            }));
+                          }}
+                          fullWidth
+                          placeholder={`Вариант ответа ${index + 1}`}
+                          size="small"
+                          error={createQuestionDialog.correctAnswerIndex === index && !answer.trim()}
+                          helperText={createQuestionDialog.correctAnswerIndex === index && !answer.trim() ? "Правильный ответ не может быть пустым" : ""}
+                        />
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Информация
+                </Typography>
+                <Typography variant="body2">
+                  • Вопрос будет создан с версией 1<br />
+                  • Отметьте правильный ответ, выбрав радиокнопку рядом с ним<br />
+                  • Можно оставить пустыми неиспользуемые варианты ответов<br />
+                  • После создания вопрос можно будет редактировать, создавая новые версии
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseCreateQuestionDialog} disabled={createQuestionDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveCreateQuestion}
+            variant="contained"
+            disabled={createQuestionDialog.loading}
+          >
+            {createQuestionDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Создать вопрос'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ РЕДАКТИРОВАНИЯ ВОПРОСА */}
+      <Dialog 
+        open={editQuestionDialog.open} 
+        onClose={handleCloseEditQuestionDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'warning.main' }}>
+                <EditIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Редактирование вопроса
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Текущая версия: {editQuestionDialog.currentVersion}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseEditQuestionDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {editQuestionDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Сохранение вопроса...</Typography>
+            </Box>
+          ) : editQuestionDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {editQuestionDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Текущие данные вопроса (версия {editQuestionDialog.currentVersion})
+                </Typography>
+                <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, mb: 2 }}>
+                  <Typography variant="body1" sx={{ mb: 1 }}>
+                    <strong>Название:</strong> {editQuestionDialog.currentTitle}
+                  </Typography>
+                  <Typography variant="body1">
+                    <strong>Текст вопроса:</strong> {editQuestionDialog.currentQuestionText}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Новое название вопроса *
+                </Typography>
+                <TextField
+                  value={editQuestionDialog.title}
+                  onChange={(e) => setEditQuestionDialog(prev => ({
+                    ...prev,
+                    title: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Введите новое название вопроса"
+                  size="small"
+                  autoFocus
+                  error={!editQuestionDialog.title.trim()}
+                  helperText={!editQuestionDialog.title.trim() ? "Название вопроса не может быть пустым" : ""}
+                />
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Новый текст вопроса *
+                </Typography>
+                <TextField
+                  value={editQuestionDialog.questionText}
+                  onChange={(e) => setEditQuestionDialog(prev => ({
+                    ...prev,
+                    questionText: e.target.value
+                  }))}
+                  fullWidth
+                  placeholder="Введите новый текст вопроса"
+                  size="small"
+                  multiline
+                  rows={4}
+                  error={!editQuestionDialog.questionText.trim()}
+                  helperText={!editQuestionDialog.questionText.trim() ? "Текст вопроса не может быть пустым" : ""}
+                />
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Новые варианты ответов (минимум 2) *
+                </Typography>
+                <Grid container spacing={2}>
+                  {editQuestionDialog.answers.map((answer, index) => (
+                    <Grid item xs={12} key={index}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Radio
+                          checked={editQuestionDialog.correctAnswerIndex === index}
+                          onChange={() => setEditQuestionDialog(prev => ({
+                            ...prev,
+                            correctAnswerIndex: index
+                          }))}
+                          disabled={!answer.trim()}
+                        />
+                        <TextField
+                          value={answer}
+                          onChange={(e) => {
+                            const newAnswers = [...editQuestionDialog.answers];
+                            newAnswers[index] = e.target.value;
+                            setEditQuestionDialog(prev => ({
+                              ...prev,
+                              answers: newAnswers
+                            }));
+                          }}
+                          fullWidth
+                          placeholder={`Вариант ответа ${index + 1}`}
+                          size="small"
+                          error={editQuestionDialog.correctAnswerIndex === index && !answer.trim()}
+                          helperText={editQuestionDialog.correctAnswerIndex === index && !answer.trim() ? "Правильный ответ не может быть пустым" : ""}
+                        />
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Важная информация
+                </Typography>
+                <Typography variant="body2">
+                  • Будет создана новая версия вопроса ({editQuestionDialog.currentVersion + 1})<br />
+                  • Старые версии вопроса сохранятся в истории<br />
+                  • Отметьте правильный ответ, выбрав радиокнопку рядом с ним<br />
+                  • Можно оставить пустыми неиспользуемые варианты ответов
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditQuestionDialog} disabled={editQuestionDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveEditQuestion}
+            variant="contained"
+            color="warning"
+            disabled={editQuestionDialog.loading}
+          >
+            {editQuestionDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Сохранить новую версию'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ УДАЛЕНИЯ ВОПРОСА */}
+      <Dialog 
+        open={deleteQuestionDialog.open} 
+        onClose={handleCloseDeleteQuestionDialog} 
+        maxWidth="sm" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'error.main' }}>
+                <DeleteIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Удаление вопроса
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  {deleteQuestionDialog.questionTitle}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseDeleteQuestionDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {deleteQuestionDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Удаление вопроса...</Typography>
+            </Box>
+          ) : deleteQuestionDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {deleteQuestionDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Информация о вопросе
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  <strong>Вопрос:</strong> {deleteQuestionDialog.questionTitle}
+                </Typography>
+                <Typography variant="body1">
+                  <strong>ID вопроса:</strong> {deleteQuestionDialog.questionId}
+                </Typography>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <WarningIcon /> Внимание!
+                </Typography>
+                <Typography variant="body2">
+                  Вы собираетесь удалить вопрос. Это действие нельзя отменить.
+                </Typography>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Важная информация о мягком удалении
+                </Typography>
+                <Typography variant="body2">
+                  • Вопрос будет отмечен как удалённый (реально ничего не удаляется)<br />
+                  • Если вопрос не используется в тестах (даже удалённых), его можно удалить<br />
+                  • Если вопрос используется в тестах, удаление не произойдет<br />
+                  • Вопрос можно будет восстановить через административный интерфейс
+                </Typography>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                  Подтверждение удаления
+                </Typography>
+                <Typography variant="body2">
+                  Для подтверждения удаления введите название вопроса:
+                </Typography>
+                <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace', textAlign: 'center' }}>
+                    {deleteQuestionDialog.questionTitle}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Убедитесь, что вы удаляете правильный вопрос
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteQuestionDialog} disabled={deleteQuestionDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleConfirmDeleteQuestion}
+            variant="contained"
+            color="error"
+            disabled={deleteQuestionDialog.loading}
+          >
+            {deleteQuestionDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Удалить вопрос'
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ДИАЛОГ ДОБАВЛЕНИЯ СУЩЕСТВУЮЩЕГО ВОПРОСА В ТЕСТ */}
+      <Dialog 
+        open={addQuestionToTestDialog.open} 
+        onClose={handleCloseAddQuestionToTestDialog} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <AddIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6">
+                  Добавление существующего вопроса в тест
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Тест: {addQuestionToTestDialog.testName}
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={handleCloseAddQuestionToTestDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {addQuestionToTestDialog.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+              <Typography sx={{ ml: 2 }}>Загрузка вопросов...</Typography>
+            </Box>
+          ) : addQuestionToTestDialog.error ? (
+            <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+              <Typography>Ошибка: {addQuestionToTestDialog.error}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Информация о тесте
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Дисциплина:</strong> {addQuestionToTestDialog.disciplineName}
+                    </Typography>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>Тест:</strong> {addQuestionToTestDialog.testName}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body1" sx={{ mb: 1 }}>
+                      <strong>ID теста:</strong> {addQuestionToTestDialog.testId}
+                    </Typography>
+                    <Typography variant="body1">
+                      <strong>ID дисциплины:</strong> {addQuestionToTestDialog.disciplineId}
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+              
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
+                  Выберите вопрос для добавления
+                </Typography>
+                
+                {addQuestionToTestDialog.allQuestions.length > 0 ? (
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="question-select-label">Выберите вопрос</InputLabel>
+                    <Select
+                      labelId="question-select-label"
+                      value={addQuestionToTestDialog.selectedQuestionId}
+                      label="Выберите вопрос"
+                      onChange={(e) => setAddQuestionToTestDialog(prev => ({
+                        ...prev,
+                        selectedQuestionId: e.target.value
+                      }))}
+                    >
+                      {addQuestionToTestDialog.allQuestions.map((question) => (
+                        <MenuItem key={question.id} value={question.id}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                            <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                              {question.name}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                              Версия: {question.version} • ID автора: {question.authorId || 'Не указан'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: '0.75rem' }}>
+                              {question.rawQuestion?.question_text ? 
+                                question.rawQuestion.question_text.substring(0, 100) + '...' : 
+                                'Без текста'}
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center', 
+                    color: 'text.secondary',
+                    border: '1px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 1
+                  }}>
+                    <Typography variant="body1" sx={{ mb: 2 }}>
+                      Нет доступных вопросов для добавления
+                    </Typography>
+                    <Button 
+                      variant="outlined" 
+                      startIcon={<AddIcon />}
+                      onClick={() => {
+                        handleCloseAddQuestionToTestDialog();
+                        handleCreateQuestionClick();
+                      }}
+                    >
+                      Создать новый вопрос
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <InfoIcon /> Важная информация
+                </Typography>
+                <Typography variant="body2">
+                  • Вопрос будет добавлен в последнюю позицию теста<br />
+                  • Если у теста уже есть попытки прохождения, добавить вопрос нельзя<br />
+                  • После добавления вопроса тест можно будет активировать<br />
+                  • Вопрос можно будет удалить из теста в любое время
+                </Typography>
+              </Box>
+              
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'warning.main', color: 'white', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <WarningIcon /> Ограничения
+                </Typography>
+                <Typography variant="body2">
+                  Вопрос можно добавить только если тест ещё не имеет попыток прохождения!
+                  Если тест уже кто-то проходил, добавление новых вопросов невозможно.
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddQuestionToTestDialog} disabled={addQuestionToTestDialog.loading}>
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveAddQuestionToTest}
+            variant="contained"
+            disabled={addQuestionToTestDialog.loading || !addQuestionToTestDialog.selectedQuestionId}
+          >
+            {addQuestionToTestDialog.loading ? (
+              <CircularProgress size={20} />
+            ) : (
+              'Добавить вопрос в тест'
+            )}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -3366,6 +6214,27 @@ function PersonalAccount() {
             <DeleteIcon fontSize="small" color="error" />
           </ListItemIcon>
           <ListItemText sx={{ color: 'error.main' }}>Удалить тест</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {/* МЕНЮ ДЕЙСТВИЙ ДЛЯ ВОПРОСА */}
+      <Menu
+        anchorEl={questionMenuAnchor}
+        open={Boolean(questionMenuAnchor)}
+        onClose={handleQuestionMenuClose}
+      >
+        <MenuItem onClick={() => handleQuestionMenuAction('edit')}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Редактировать вопрос</ListItemText>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => handleQuestionMenuAction('delete')}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" color="error" />
+          </ListItemIcon>
+          <ListItemText sx={{ color: 'error.main' }}>Удалить вопрос</ListItemText>
         </MenuItem>
       </Menu>
 
@@ -3773,6 +6642,167 @@ function PersonalAccount() {
         </DialogActions>
       </Dialog>
 
+      {/* ДИАЛОГ РЕЗУЛЬТАТОВ ПОПЫТКИ ТЕСТА */}
+<Dialog 
+  open={viewAttemptDialog.open} 
+  onClose={() => setViewAttemptDialog(prev => ({ ...prev, open: false }))} 
+  maxWidth="md" 
+  fullWidth
+>
+  <DialogTitle>
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Avatar sx={{ bgcolor: 'primary.main' }}>
+          <GradeIcon />
+        </Avatar>
+        <Box>
+          <Typography variant="h6">
+            Результаты попытки теста
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            {viewAttemptDialog.testName} • {viewAttemptDialog.userName}
+          </Typography>
+        </Box>
+      </Box>
+      <IconButton onClick={() => setViewAttemptDialog(prev => ({ ...prev, open: false }))} size="small">
+        <CloseIcon />
+      </IconButton>
+    </Box>
+  </DialogTitle>
+  
+  <DialogContent dividers>
+    {viewAttemptDialog.loading ? (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <CircularProgress />
+        <Typography sx={{ ml: 2 }}>Загрузка результатов...</Typography>
+      </Box>
+    ) : viewAttemptDialog.error ? (
+      <Box sx={{ p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
+        <Typography>Ошибка: {viewAttemptDialog.error}</Typography>
+      </Box>
+    ) : viewAttemptDialog.questions.length > 0 ? (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, py: 2 }}>
+        {/* Статистика */}
+        <Box sx={{ 
+          p: 2, 
+          borderRadius: 2,
+          border: '2px solid',
+          borderColor: viewAttemptDialog.score >= 70 ? 'success.main' : 
+                      viewAttemptDialog.score >= 50 ? 'warning.main' : 'error.main',
+          bgcolor: viewAttemptDialog.score >= 70 ? 'rgba(76, 175, 80, 0.1)' : 
+                   viewAttemptDialog.score >= 50 ? 'rgba(255, 152, 0, 0.1)' : 'rgba(244, 67, 54, 0.1)',
+          textAlign: 'center'
+        }}>
+          <Typography variant="h4" sx={{ 
+            color: viewAttemptDialog.score >= 70 ? 'success.main' : 
+                   viewAttemptDialog.score >= 50 ? 'warning.main' : 'error.main',
+            mb: 1
+          }}>
+            {viewAttemptDialog.score}%
+          </Typography>
+          <Typography variant="body1">
+            Правильных ответов: {viewAttemptDialog.questions.filter(q => q.is_correct).length} из {viewAttemptDialog.questions.length}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Статус: {viewAttemptDialog.status === 'completed' ? 'Завершено' : 'В процессе'}
+          </Typography>
+        </Box>
+        
+        {/* Список вопросов и ответов */}
+        <Box>
+          <Typography variant="h6" sx={{ mb: 3 }}>
+            Ответы пользователя
+          </Typography>
+          
+          {viewAttemptDialog.questions.map((question, index) => (
+            <Card key={index} sx={{ mb: 2, border: '1px solid', 
+              borderColor: question.is_correct ? 'success.main' : 'error.main' }}>
+              <CardContent>
+                <Box sx={{ 
+                  p: 1, 
+                  mb: 2, 
+                  borderRadius: 1,
+                  bgcolor: question.is_correct ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}>
+                  {question.is_correct ? (
+                    <CheckCircleIcon color="success" />
+                  ) : (
+                    <CloseIcon color="error" />
+                  )}
+                  <Typography variant="body2" color={question.is_correct ? 'success.main' : 'error.main'}>
+                    {question.is_correct ? 'Правильный ответ' : 'Неправильный ответ'}
+                  </Typography>
+                </Box>
+                
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium' }}>
+                  Вопрос {index + 1}: {question.question_text}
+                </Typography>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                      Ответ пользователя:
+                    </Typography>
+                    <Box sx={{ 
+                      p: 2, 
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'primary.main',
+                      bgcolor: 'rgba(25, 118, 210, 0.05)'
+                    }}>
+                      <Typography variant="body1">
+                        {question.user_answer || 'Ответ не предоставлен'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  
+                  {!question.is_correct && question.correct_answer && (
+                    <Grid item xs={12} md={6}>
+                      <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+                        Правильный ответ:
+                      </Typography>
+                      <Box sx={{ 
+                        p: 2, 
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'success.main',
+                        bgcolor: 'rgba(76, 175, 80, 0.05)'
+                      }}>
+                        <Typography variant="body1">
+                          {question.correct_answer}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
+      </Box>
+    ) : (
+      <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
+        <QuizIcon sx={{ fontSize: 60, mb: 2, opacity: 0.5 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          Результаты не найдены
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 3 }}>
+          Нет данных о результатах этой попытки
+        </Typography>
+      </Box>
+    )}
+  </DialogContent>
+  
+  <DialogActions>
+    <Button onClick={() => setViewAttemptDialog(prev => ({ ...prev, open: false }))}>
+      Закрыть
+    </Button>
+  </DialogActions>
+</Dialog>
+
       {/* ДИАЛОГ УДАЛЕНИЯ ТЕСТА */}
       <Dialog 
         open={deleteTestDialog.open} 
@@ -3856,8 +6886,7 @@ function PersonalAccount() {
                   • Тест можно будет восстановить через административный интерфейс
                 </Typography>
               </Box>
-              
-              <Box>
+                            <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
                   Подтверждение удаления
                 </Typography>
@@ -4215,28 +7244,6 @@ function PersonalAccount() {
               </Box>
               
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
-                  Роли пользователя
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {selectedUserInfo.roles && selectedUserInfo.roles.length > 0 ? (
-                    selectedUserInfo.roles.map((role, index) => {
-                      const RoleIcon = getRoleIcon(role);
-                      return (
-                        <Chip
-                          key={index}
-                          label={role}
-                          icon={RoleIcon}
-                          size="medium"
-                          color={getRoleChipColor(role)}
-                          variant="outlined"
-                        />
-                      );
-                    })
-                  ) : (
-                    <Chip label="Без ролей" size="medium" color="default" />
-                  )}
-                </Box>
               </Box>
               
               <Box>
@@ -4519,41 +7526,7 @@ function PersonalAccount() {
                 <Typography variant="subtitle2" sx={{ mb: 2, color: 'text.secondary' }}>
                   {blockUserData.newBlocked ? 'Причина блокировки' : 'Причина разблокировки'}
                 </Typography>
-                <TextField
-                  value={blockUserData.reason}
-                  onChange={(e) => setBlockUserData(prev => ({
-                    ...prev,
-                    reason: e.target.value
-                  }))}
-                  fullWidth
-                  placeholder={blockUserData.newBlocked ? "Укажите причину блокировки..." : "Укажите причину разблокировки..."}
-                  size="small"
-                  multiline
-                  rows={3}
-                />
               </Box>
-              
-              {blockUserData.newBlocked ? (
-                <Box sx={{ mt: 2, p: 2, bgcolor: 'error.main', color: 'white', borderRadius: 1 }}>
-                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <WarningIcon /> Внимание!
-                  </Typography>
-                  <Typography variant="body2">
-                    • Заблокированный пользователь не сможет войти в систему<br />
-                    • Все его текущие сессии будут завершены<br />
-                    • Пользователь может быть разблокирован в любой момент
-                  </Typography>
-                </Box>
-              ) : (
-                <Box sx={{ mt: 2, p: 2, bgcolor: 'success.main', color: 'white', borderRadius: 1 }}>
-                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <InfoIcon /> Информация
-                  </Typography>
-                  <Typography variant="body2">
-                    После разблокировки пользователь сможет войти в систему со своим текущим паролем.
-                  </Typography>
-                </Box>
-              )}
             </Box>
           )}
         </DialogContent>
@@ -4565,7 +7538,7 @@ function PersonalAccount() {
             onClick={handleConfirmBlock}
             variant="contained"
             color={blockUserData.newBlocked ? "error" : "success"}
-            disabled={blockLoading || (blockUserData.newBlocked && !blockUserData.reason.trim())}
+            disabled={blockLoading}
           >
             {blockLoading ? (
               <CircularProgress size={20} />

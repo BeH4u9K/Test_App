@@ -2,6 +2,7 @@
 #include "../include/utils.hpp"
 #include "../include/mongodb.hpp"
 #include "../include/jwt_token.hpp"
+#include "../include/permissions.hpp"
 #include <iostream>
 #include <random>
 
@@ -17,21 +18,23 @@ void handle_yandex_callback(
     std::shared_ptr<JWTHandler> jwt_handler
 ) {
     std::string code = req.get_param_value("code");
-    std::string oauth_state = req.get_param_value("state");
+    std::string state = req.get_param_value("state");
     std::string error = req.get_param_value("error");
+
+    std::cout << "Yandex callback received - code: " << code << ", state: " << state << std::endl;
     
     if (!error.empty()) {
-        storage.update_session_status_by_oauth_state(oauth_state, AuthStatus::DENIED);
+        storage.update_session_status(state, AuthStatus::DENIED);
         res.set_content("<h1>Авторизация отменена</h1><p>Вы отказались от авторизации через Яндекс.</p><p>Закройте это окно и вернитесь в приложение.</p>", "text/html; charset=utf-8");
         return;
     }
     
-    if (code.empty() || oauth_state.empty()) {
+    if (code.empty() || state.empty()) {
         res.set_content("<h1>Ошибка</h1><p>Отсутствуют необходимые параметры.</p>", "text/html; charset=utf-8");
         return;
     }
 
-    auto session_opt = storage.get_session_by_oauth_state(oauth_state);
+    auto session_opt = storage.get_session(state);
     if (!session_opt) {
         res.set_content("<h1>Ошибка</h1><p>Сессия не найдена или истекла.</p>", "text/html; charset=utf-8");
         return;
@@ -49,8 +52,8 @@ void handle_yandex_callback(
     auto token_res = cli.Post("/token", post_body, "application/x-www-form-urlencoded");
     
     if (!token_res || token_res->status != 200) {
-        storage.update_session_status_by_oauth_state(oauth_state, AuthStatus::DENIED);
-        res.set_content("<h1>Ошибка</h1><p>Не удалось получить токен от Яндекс.</p>", "text/html; charset=utf-8");
+        storage.update_session_status(state, AuthStatus::DENIED);
+        res.set_content("<h1>Token error</h1>", "text/html");
         return;
     }
     
@@ -62,15 +65,19 @@ void handle_yandex_callback(
     auto user_res = yandex_cli.Get("/info?format=json", headers);
     
     if (!user_res || user_res->status != 200) {
-        storage.update_session_status_by_oauth_state(oauth_state, AuthStatus::DENIED);
-        res.set_content("<h1>Ошибка</h1><p>Не удалось получить данные пользователя.</p>", "text/html; charset=utf-8");
+        storage.update_session_status(state, AuthStatus::DENIED);
+        res.set_content("<h1>Ошибка</h1><p>Не удалось получить токен от Яндекс.</p>", "text/html; charset=utf-8");
         return;
     }
     
     json user_data = json::parse(user_res->body);
     std::string email = user_data["default_email"].get<std::string>();
+
+    std::cout << "Successfully extracted Yandex email: " << email << std::endl;
+
+    auto user_opt = mongo_db->find_user(email);
     
-    auto user_opt = mongo_db->find_user_by_email(email);
+    std::vector<std::string> roles;
     
     if (!user_opt) {
         std::random_device rd;
@@ -79,25 +86,26 @@ void handle_yandex_callback(
         std::string username = "Аноним" + std::to_string(dis(gen));
         
         mongo_db->create_user(email, username);
+        roles = {"Студент"};
+    } else {
+        User user = *user_opt;
+        roles = user.roles;
     }
-
+    
     send_user_to_main_module(email);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::vector<std::string> permissions = get_permissions_from_roles(roles);
+
+    std::string jwt_access_token = jwt_handler->generate_access_token(permissions);
+    std::string jwt_refresh_token = jwt_handler->generate_refresh_token(email);
+
+    std::cout << "Generated JWT tokens for " << email << " - access_token: " << jwt_access_token.substr(0, 20) 
+        << "..." << " - refresh_token: " << jwt_refresh_token.substr(0, 20) << "..." << std::endl;
+
+    mongo_db->add_tokens(email, jwt_access_token, jwt_refresh_token);
+
+    storage.update_session_status(state, AuthStatus::GRANTED, jwt_access_token, jwt_refresh_token);
     
-    std::string user_id = "yandex_user_" + email.substr(0, email.find('@'));
-    
-    std::string jwt_access_token = jwt_handler->generate_access_token(user_id, email);
-    std::string jwt_refresh_token = jwt_handler->generate_refresh_token(user_id, email);
-    
-    mongo_db->add_refresh_token(email, jwt_refresh_token);
-    
-    session.status = AuthStatus::GRANTED;
-    session.access_token = jwt_access_token;
-    session.refresh_token = jwt_refresh_token;
-    session.user_id = user_id;
-    
-    storage.update_session(session);
-    
+    std::cout << "Yandex auth successful for email: " << email << std::endl;
     res.set_content("<h1>Успешная авторизация!</h1><p>Вы успешно авторизовались через Яндекс.</p><p>Закройте это окно и вернитесь в приложение.</p>", "text/html; charset=utf-8");
 }

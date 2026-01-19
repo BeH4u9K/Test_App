@@ -121,10 +121,8 @@ private:
     }
 
     std::string hmac_sha256(const std::string& data) const {
-        unsigned char* digest = HMAC(EVP_sha256(), 
-                     secret_key_.c_str(), secret_key_.length(),
-                     (unsigned char*)data.c_str(), data.length(),
-                     NULL, NULL);
+        unsigned char* digest = HMAC(EVP_sha256(), secret_key_.c_str(), secret_key_.length(),
+            (unsigned char*)data.c_str(), data.length(), NULL, NULL);
         
         std::stringstream ss;
         for(int i = 0; i < 32; i++) {
@@ -153,10 +151,7 @@ private:
 public:
     JWTHandler(const std::string& secret_key) : secret_key_(secret_key) {}
     
-    std::string generate_access_token(
-        const std::string& user_id,
-        const std::string& email
-    ) {
+    std::string generate_access_token(const std::vector<std::string>& permissions) {
         nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
         std::string header_encoded = base64_url_encode(header.dump());
 
@@ -164,8 +159,7 @@ public:
         auto exp = now + std::chrono::minutes(1);
         
         nlohmann::json payload = {
-            {"sub", user_id},
-            {"email", email},
+            {"permissions", permissions},
             {"token_type", "access"},
             {"iat", std::chrono::system_clock::to_time_t(now)},
             {"exp", std::chrono::system_clock::to_time_t(exp)}
@@ -177,10 +171,7 @@ public:
         return header_encoded + "." + payload_encoded + "." + signature_encoded;
     }
     
-    std::string generate_refresh_token(
-        const std::string& user_id,
-        const std::string& email
-    ) {
+    std::string generate_refresh_token(const std::string& email) {
         nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
         std::string header_encoded = base64_url_encode(header.dump());
 
@@ -188,7 +179,6 @@ public:
         auto exp = now + std::chrono::hours(24 * 7);
         
         nlohmann::json payload = {
-            {"sub", user_id},
             {"email", email},
             {"token_type", "refresh"},
             {"iat", std::chrono::system_clock::to_time_t(now)},
@@ -221,15 +211,8 @@ public:
     }
 
     bool is_refresh_token(const std::string& token) {
-        auto parts = split_token(token);
-        if (parts.size() != 3) {
-            return false;
-        }
-        
-        std::string payload_decoded = base64_url_decode(parts[1]);
-        auto payload_json = nlohmann::json::parse(payload_decoded);
-        
-        return payload_json["token_type"].get<std::string>() == "refresh";
+        auto email = get_email(token);
+        return email.has_value();
     }
 
     std::optional<std::string> get_email(const std::string& token) {
@@ -241,10 +224,14 @@ public:
         std::string payload_decoded = base64_url_decode(parts[1]);
         auto payload_json = nlohmann::json::parse(payload_decoded);
         
-        return payload_json["email"].get<std::string>();
+        if (payload_json.contains("email") && payload_json["email"].is_string()) {
+            return payload_json["email"].get<std::string>();
+        }
+        
+        return std::nullopt;
     }
 
-    std::optional<std::string> get_user_id(const std::string& token) {
+    std::optional<std::vector<std::string>> get_permissions(const std::string& token) {
         auto parts = split_token(token);
         if (parts.size() != 3) {
             return std::nullopt;
@@ -253,6 +240,14 @@ public:
         std::string payload_decoded = base64_url_decode(parts[1]);
         auto payload_json = nlohmann::json::parse(payload_decoded);
         
-        return payload_json["sub"].get<std::string>();
+        if (payload_json.contains("permissions") && payload_json["permissions"].is_array()) {
+            std::vector<std::string> permissions;
+            for (const auto& perm : payload_json["permissions"]) {
+                permissions.push_back(perm.get<std::string>());
+            }
+            return permissions;
+        }
+        
+        return std::nullopt;
     }
 };
