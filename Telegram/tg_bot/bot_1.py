@@ -1,4 +1,3 @@
-# bot_1.py
 import uvicorn
 import logging
 import uuid
@@ -155,103 +154,6 @@ async def get_max_user_id(chat_id: int, access_token: str, refresh_token: str) -
 
 # ============= ФУНКЦИИ ДЛЯ ПРОХОЖДЕНИЯ ТЕСТОВ =============
 
-async def start_test_attempt(chat_id: int, user_data: dict, test_id: int):
-    """Начать новую попытку теста"""
-    try:
-        access_token = user_data.get("access_token", "")
-        refresh_token = user_data.get("refresh_token", "")
-        user_id_str = user_data.get("user_id", "")
-        
-        if not user_id_str or not access_token:
-            return False, None, "Ошибка авторизации"
-        
-        # Проверяем, есть ли уже активная попытка
-        if redis_client.get_active_attempt(chat_id):
-            return False, None, "У вас уже есть активный тест. Завершите его сначала."
-        
-        # Создаем попытку через API
-        data = {"test_id": test_id}
-        result = await call_api_with_retry(
-            chat_id, access_token, refresh_token, user_id_str,
-            f"/api/v1/users/{user_id_str}/attempts", "POST", data
-        )
-        
-        if isinstance(result, dict) and "error" in result:
-            return False, None, f"Ошибка API: {result['error']}"
-        
-        if isinstance(result, dict) and "attempt_id" in result:
-            attempt_id = result["attempt_id"]
-            questions = result.get("questions", [])
-            
-            if questions:
-                # Сохраняем активную попытку в Redis
-                redis_client.set_active_attempt(
-                    chat_id, 
-                    attempt_id=attempt_id,
-                    test_id=test_id,
-                    user_id=user_id_str,
-                    questions=questions,
-                    current_question=0,
-                    answers={}
-                )
-                return True, attempt_id, questions
-            else:
-                return False, None, "Тест не содержит вопросов"
-        else:
-            return False, None, "Не удалось создать попытку"
-    except Exception as e:
-        logging.error(f"Error starting test attempt: {e}")
-        return False, None, f"Ошибка: {str(e)}"
-
-async def handle_test_answer(chat_id: int, answer_num: int, user_data: dict):
-    """Обработка ответа на вопрос теста"""
-    try:
-        # Получаем активную попытку
-        attempt_data = redis_client.get_active_attempt(chat_id)
-        if not attempt_data:
-            return {"response": "У вас нет активного теста. Начните тест с помощью /start_test [test_id]"}
-        
-        questions = attempt_data.get("questions", [])
-        current_index = attempt_data.get("current_question", 0)
-        answers = attempt_data.get("answers", {})
-        
-        if current_index >= len(questions):
-            # Все вопросы пройдены
-            redis_client.delete_active_attempt(chat_id)
-            return {"response": "Все вопросы пройдены! Используйте /finish_test для завершения теста."}
-        
-        current_question = questions[current_index]
-        
-        # Проверяем, что введенный номер ответа валиден
-        options = current_question.get("options", [])
-        
-        if 1 <= answer_num <= len(options):
-            selected_option = options[answer_num - 1]
-            option_id = selected_option.get("id")
-            question_id = current_question.get("id")
-            
-            # Сохраняем ответ
-            answers[str(question_id)] = option_id
-            
-            # Переходим к следующему вопросу
-            current_index += 1
-            redis_client.update_attempt_question(chat_id, current_index, answers)
-            
-            if current_index < len(questions):
-                # Показываем следующий вопрос
-                next_question = questions[current_index]
-                return await format_question(next_question, current_index, len(questions))
-            else:
-                # Все вопросы пройдены
-                redis_client.delete_active_attempt(chat_id)
-                return {"response": "Все вопросы пройдены! Используйте /finish_test для завершения теста и получения результата."}
-        else:
-            return {"response": f"Пожалуйста, выберите вариант от 1 до {len(options)}"}
-            
-    except Exception as e:
-        logging.error(f"Error handling question answer: {e}")
-        return {"response": f"Ошибка обработки ответа: {str(e)}"}
-
 async def format_question(question: dict, question_num: int, total_questions: int):
     """Форматирование вопроса для вывода"""
     title = question.get("title", "")
@@ -273,55 +175,50 @@ async def format_question(question: dict, question_num: int, total_questions: in
     
     return {"response": response}
 
-async def finish_test_attempt(chat_id: int, user_data: dict):
-    """Завершение попытки теста и отправка ответов"""
+async def handle_test_answer(chat_id: int, answer_num: int, user_data: dict):
+    """Обработка ответа на вопрос теста"""
     try:
-        access_token = user_data.get("access_token", "")
-        refresh_token = user_data.get("refresh_token", "")
-        user_id_str = user_data.get("user_id", "")
-        
         # Получаем активную попытку
         attempt_data = redis_client.get_active_attempt(chat_id)
         if not attempt_data:
-            return {"response": "У вас нет активного теста для завершения"}
+            return {"response": "У вас нет активного теста. Начните тест с помощью /start_test [test_id]"}
         
-        attempt_id = attempt_data.get("attempt_id")
+        questions = attempt_data.get("questions", [])
+        current_index = attempt_data.get("current_question", 0)
         answers = attempt_data.get("answers", {})
         
-        # Формируем ответы в нужном формате
-        formatted_answers = []
-        for question_id_str, option_id in answers.items():
-            formatted_answers.append({
-                "question_id": int(question_id_str),
-                "answer_option_id": option_id
-            })
+        if current_index >= len(questions):
+            return {"response": "Вы уже ответили на все вопросы. Используйте /finish_test для завершения теста."}
         
-        # Создаем структуру запроса для завершения попытки
-        data = {"answers": formatted_answers}
+        current_question = questions[current_index]
+        question_id = current_question.get("id")
+        options = current_question.get("options", [])
         
-        # Отправляем ответы на сервер для завершения попытки
-        result = await call_api_with_retry(
-            chat_id, access_token, refresh_token, user_id_str,
-            f"/api/v1/users/{user_id_str}/attempts/{attempt_id}", "PUT", data
-        )
-        
-        # Удаляем активную попытку
-        redis_client.delete_active_attempt(chat_id)
-        
-        if isinstance(result, dict) and "score" in result:
-            score = result.get("score", 0)
-            return {
-                "response": f"Тест завершен!\n\n"
-                          f"Ваш результат: {score} баллов\n"
-                          f"ID попытки: {attempt_id}"
-            }
+        # Проверяем, что введенный номер ответа валиден
+        if 1 <= answer_num <= len(options):
+            selected_option = options[answer_num - 1]
+            option_id = selected_option.get("id")
+            
+            # Сохраняем ответ
+            answers[str(question_id)] = option_id
+            
+            # Переходим к следующему вопросу
+            current_index += 1
+            redis_client.update_attempt_question(chat_id, current_index, answers)
+            
+            if current_index < len(questions):
+                # Показываем следующий вопрос
+                next_question = questions[current_index]
+                return await format_question(next_question, current_index, len(questions))
+            else:
+                # Все вопросы пройдены
+                return {"response": "Вы ответили на все вопросы! Используйте /finish_test для завершения теста и получения результата."}
         else:
-            error_msg = result.get("error", "Не удалось получить результат")
-            return {"response": f"Тест завершен, но: {error_msg}"}
+            return {"response": f"Пожалуйста, выберите вариант от 1 до {len(options)}"}
             
     except Exception as e:
-        logging.error(f"Error finishing test attempt: {e}")
-        return {"response": f"Ошибка при завершении теста: {str(e)}"}
+        logging.error(f"Error handling question answer: {e}")
+        return {"response": f"Ошибка обработки ответа: {str(e)}"}
 
 # ============= ФУНКЦИИ ДЛЯ ПАРСИНГА КОМАНД =============
 
@@ -364,6 +261,14 @@ def parse_command(text: str) -> Tuple[str, List[Any]]:
     if text == "/finish_test":
         return "finish_test", []
     
+    # === ПОПЫТКИ ===
+    if text == "/my_attempts":
+        return "my_attempts", []
+    
+    match = re.match(r'^/attempt (\d+)$', text)
+    if match:
+        return "my_attempt", [int(match.group(1))]
+    
     # === ПОЛЬЗОВАТЕЛИ ===
     if text == "/users":
         return "list_users", []
@@ -386,9 +291,6 @@ def parse_command(text: str) -> Tuple[str, List[Any]]:
     if text == "/my_profile":
         return "my_profile", []
     
-    if text == "/my_attempts":
-        return "my_attempts", []
-    
     # === АВТОРИЗАЦИЯ ===
     if text.startswith("/login"):
         parts = text.split()
@@ -408,6 +310,8 @@ def parse_command(text: str) -> Tuple[str, List[Any]]:
     return "unknown", []
 
 # ============= ОБРАБОТЧИКИ КОМАНД =============
+
+
 
 async def handle_authorized_user(chat_id: int, text: str, user_data: dict):
     """Обработка команд для авторизованного пользователя"""
@@ -534,6 +438,8 @@ async def handle_authorized_user(chat_id: int, text: str, user_data: dict):
     
     elif command == "my_attempts":
         try:
+            # Используем правильный endpoint для получения всех попыток пользователя
+            # Согласно routes.go, endpoint: /api/v1/users/{id}/attempts
             result = await call_api_with_retry(
                 chat_id, access_token, refresh_token, user_id_str,
                 f"/api/v1/users/{user_id_int}/attempts", "GET"
@@ -541,38 +447,139 @@ async def handle_authorized_user(chat_id: int, text: str, user_data: dict):
             return await format_response(result, "Ваши попытки")
         except Exception as e:
             logging.error(f"Error in my_attempts command: {e}")
-            return {"response": "Нет информации о ваших попытках"}
+            return {"response": f"Ошибка при получении ваших попыток: {str(e)}"}
+    
+    elif command == "my_attempt":
+        if len(args) == 1:
+            attempt_id = args[0]
+            try:
+                # Получаем конкретную попытку
+                # Согласно routes.go, endpoint: /api/v1/users/{userID}/attempts/{attemptID}
+                result = await call_api_with_retry(
+                    chat_id, access_token, refresh_token, user_id_str,
+                    f"/api/v1/users/{user_id_int}/attempts/{attempt_id}", "GET"
+                )
+                return await format_response(result, f"Попытка ID:{attempt_id}")
+            except Exception as e:
+                logging.error(f"Error in my_attempt command: {e}")
+                return {"response": f"Ошибка при получении попытки: {str(e)}"}
+        else:
+            return {"response": "Использование: /attempt [id_попытки]"}
     
     elif command == "start_test":
         test_id = args[0]
         
-        # Начинаем попытку теста
-        success, attempt_id, result = await start_test_attempt(
-            chat_id, user_data, test_id
+        # Проверяем, есть ли уже активная попытка
+        if redis_client.get_active_attempt(chat_id):
+            return {"response": "У вас уже есть активный тест. Завершите его с помощью /finish_test или отмените /cancel_test"}
+        
+        # Создаем новую попытку через API
+        data = {"test_id": test_id}
+        result = await call_api_with_retry(
+            chat_id, access_token, refresh_token, user_id_str,
+            f"/api/v1/users/{user_id_int}/attempts", "POST", data
         )
         
-        if success:
-            # Показываем первый вопрос
-            questions = result
-            if questions and len(questions) > 0:
-                return await format_question(questions[0], 0, len(questions))
-            else:
+        if isinstance(result, dict) and "error" in result:
+            return {"response": f"Ошибка при создании попытки: {result['error']}"}
+        
+        # Проверяем, что в ответе есть attempt_id и questions
+        if isinstance(result, dict) and "attempt_id" in result and "questions" in result:
+            attempt_id = result["attempt_id"]
+            questions = result["questions"]
+            
+            if not questions:
                 return {"response": "Тест не содержит вопросов"}
+            
+            # Сохраняем активную попытку в Redis
+            redis_client.set_active_attempt(
+                chat_id, 
+                attempt_id=attempt_id,
+                test_id=test_id,
+                user_id=user_id_str,
+                questions=questions,
+                current_question=0,
+                answers={}
+            )
+            
+            # Показываем первый вопрос
+            return await format_question(questions[0], 0, len(questions))
         else:
-            return {"response": f"Не удалось начать тест: {result}"}
+            return {"response": "Не удалось создать попытку. Проверьте ID теста."}
     
     elif command == "cancel_test":
         # Отменяем активную попытку
-        redis_client.delete_active_attempt(chat_id)
-        return {"response": "Тест отменен. Вы можете начать новый тест с помощью /start_test [test_id]"}
+        if redis_client.get_active_attempt(chat_id):
+            redis_client.delete_active_attempt(chat_id)
+            return {"response": "Тест отменен. Вы можете начать новый тест с помощью /start_test [test_id]"}
+        else:
+            return {"response": "У вас нет активного теста для отмены"}
     
     elif command == "finish_test":
-        # Завершаем активную попытку
-        return await finish_test_attempt(chat_id, user_data)
+        # Проверяем, есть ли активная попытка
+        attempt_data = redis_client.get_active_attempt(chat_id)
+        if not attempt_data:
+            return {"response": "У вас нет активного теста для завершения"}
+        
+        attempt_id = attempt_data.get("attempt_id")
+        answers = attempt_data.get("answers", {})
+        questions = attempt_data.get("questions", [])
+        
+        # Проверяем, что на все вопросы ответили
+        answered_questions = set(answers.keys())
+        all_questions = {str(q.get("id")) for q in questions if q.get("id")}
+        
+        if len(answered_questions) < len(all_questions):
+            unanswered = all_questions - answered_questions
+            return {"response": f"Вы ответили не на все вопросы. Осталось вопросов: {len(unanswered)}. Продолжайте отвечать."}
+        
+        # Формируем ответы в формате для API
+        # ВАЖНО: В примере JSON видно, что question_id и answer_option_id - это ID, а не номера
+        formatted_answers = []
+        for question_id_str, answer_option_id in answers.items():
+            formatted_answers.append({
+                "question_id": int(question_id_str),
+                "answer_option_id": answer_option_id  # Это уже ID варианта ответа
+            })
+        
+        # Отправляем ответы на сервер для завершения попытки
+        data = {"answers": formatted_answers}
+        result = await call_api_with_retry(
+            chat_id, access_token, refresh_token, user_id_str,
+            f"/api/v1/users/{user_id_int}/attempts/{attempt_id}", "PUT", data
+        )
+        
+        # Удаляем активную попытку из Redis
+        redis_client.delete_active_attempt(chat_id)
+        
+        if isinstance(result, dict) and "error" in result:
+            return {"response": f"Ошибка при завершении теста: {result['error']}"}
+        
+        # Проверяем структуру ответа
+        if isinstance(result, dict):
+            if "score" in result:
+                score = result.get("score", 0)
+                return {
+                    "response": f"Тест успешно завершен!\n"
+                               f"ID попытки: {attempt_id}\n"
+                               f"Набрано баллов: {score}"
+                }
+            elif "message" in result and "score" in result:
+                score = result.get("score", 0)
+                return {
+                    "response": f"Тест успешно завершен!\n"
+                               f"ID попытки: {attempt_id}\n"
+                               f"Набрано баллов: {score}"
+                }
+            else:
+                return {"response": f"Тест завершен. Ответ сервера: {str(result)}"}
+        else:
+            return {"response": "Тест завершен, но не удалось получить результат"}
     
     elif command == "test_answer":
-        # Обработка ответа на вопрос теста (1-9)
-        if not redis_client.get_active_attempt(chat_id):
+        # Проверяем, есть ли активная попытка
+        attempt_data = redis_client.get_active_attempt(chat_id)
+        if not attempt_data:
             return {"response": "У вас нет активного теста. Начните тест с помощью /start_test [test_id]"}
         
         return await handle_test_answer(chat_id, args[0], user_data)
@@ -582,7 +589,6 @@ async def handle_authorized_user(chat_id: int, text: str, user_data: dict):
     
     else:
         return {"response": "Команда не реализована. Используйте /help для списка доступных команд"}
-
 # ============= ОБРАБОТЧИКИ КОНКРЕТНЫХ КОМАНД =============
 
 async def handle_help():
@@ -603,6 +609,10 @@ async def handle_help():
 /cancel_test - Отменить текущий тест
 /finish_test - Завершить тест и отправить ответы
 
+ПОПЫТКИ:
+/my_attempts - Мои попытки тестирования
+/attempt [id] - Информация о конкретной попытке
+
 ПОЛЬЗОВАТЕЛИ:
 /users - Все пользователи
 /user [id] - Информация о пользователе
@@ -615,19 +625,12 @@ async def handle_help():
 
 МОИ КОМАНДЫ:
 /my_profile - Мой профиль
-/my_attempts - Мои попытки
 
 АВТОРИЗАЦИЯ:
 /login - Проверить статус авторизации
 /login [type] - Авторизация (github/yandex/code)
 /logout - Выйти
-
-ПРИМЕР РАБОТЫ С ТЕСТАМИ:
-1. /disciplines - посмотреть все дисциплины
-2. /tests 1 - посмотреть тесты дисциплины с ID 1
-3. /start_test 5 - начать тест с ID 5
-4. 1 - ответить "вариант 1" на первый вопрос
-5. /finish_test - завершить тест и получить результат"""
+"""
     return {"response": help_text}
 
 async def format_response(result: dict, title: str = "") -> dict:
