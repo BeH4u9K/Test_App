@@ -86,7 +86,7 @@ void handle_yandex_callback(
         std::string username = "Аноним" + std::to_string(dis(gen));
         
         mongo_db->create_user(email, username);
-        roles = {"Student"};
+        roles = {"Студент"};
     } else {
         User user = *user_opt;
         roles = user.roles;

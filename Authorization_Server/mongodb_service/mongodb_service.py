@@ -31,7 +31,7 @@ def create_user():
     user_data = {
         "email": data['email'],
         "username": data['username'],
-        "roles": ["Student"],
+        "roles": ["Студент"],
         "access_tokens": [],
         "refresh_tokens": []
     }
