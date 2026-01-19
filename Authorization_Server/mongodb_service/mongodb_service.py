@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
+from datetime import datetime
 from bson import ObjectId, json_util
 import json
 
@@ -31,6 +32,7 @@ def create_user():
         "email": data['email'],
         "username": data['username'],
         "roles": ["Student"],
+        "access_tokens": [],
         "refresh_tokens": []
     }
     
@@ -41,13 +43,18 @@ def create_user():
     else:
         return jsonify({"error": "Failed to create user"}), 500
 
-@app.route('/add_refresh_token', methods=['POST'])
-def add_refresh_token():
+@app.route('/add_tokens', methods=['POST'])
+def add_tokens():
     data = request.json
 
     result = users_collection.update_one(
         {"email": data['email']},
-        {"$push": {"refresh_tokens": data['refresh_token']}}
+        {
+            "$push": {
+                "access_tokens": data['access_token'],
+                "refresh_tokens": data['refresh_token']
+            }
+        }
     )
     
     if result.modified_count > 0:
@@ -55,7 +62,16 @@ def add_refresh_token():
     else:
         user = users_collection.find_one({"email": data['email']})
         if user:
-            return jsonify({"success": True, "message": "Token might already exist"})
+            users_collection.update_one(
+                {"email": data['email']},
+                {
+                    "$set": {
+                        "access_tokens": [data['access_token']],
+                        "refresh_tokens": [data['refresh_token']]
+                    }
+                }
+            )
+            return jsonify({"success": True})
         else:
             return jsonify({"error": "User not found"}), 404
 
