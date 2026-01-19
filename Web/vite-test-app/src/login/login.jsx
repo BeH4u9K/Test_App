@@ -5,7 +5,6 @@ import gitIcon from '../IMG/git.png';
 import codeIcon from '../IMG/code.png';
 import yandexIcon from '../IMG/yandex.png';
 
-// Стили
 const Body = styled('div')({
   backgroundColor: '#A3ADB1',
   display: 'flex',
@@ -71,42 +70,12 @@ const Status = styled('div')({
   width: '100%',
   backgroundColor: '#E8F6F3',
   borderRadius: '5px',
-});
-
-const ScenarioInfo = styled('div')({
-  backgroundColor: '#2C3E50',
-  color: '#FFF',
-  padding: '15px',
-  borderRadius: '10px',
-  marginBottom: '20px',
-  width: '100%',
-  textAlign: 'left',
-  border: '2px solid #F39C12'
-});
-
-const StepList = styled('div')({
-  fontSize: '12px',
-  whiteSpace: 'pre-line',
-  lineHeight: '1.5',
-  marginTop: '10px'
-});
-
-const StepItem = styled('div')({
-  marginBottom: '5px',
-  paddingLeft: '20px',
-  position: 'relative',
-  '&:before': {
-    content: '"→"',
-    position: 'absolute',
-    left: '5px',
-    color: '#F39C12'
-  }
+  color:'black'
 });
 
 const BACKEND_URL = 'http://localhost:3007';
 const AUTH_SERVER_URL = 'http://localhost:8080';
 
-// Генерация токена
 const generateToken = () => {
   const array = new Uint8Array(32);
   window.crypto.getRandomValues(array);
@@ -116,19 +85,71 @@ const generateToken = () => {
     .replace(/=+$/, '');
 };
 
-// Генерация User ID
 const generateUserId = () => {
   const timestamp = Date.now();
   const random = Math.floor(Math.random() * 1000000);
   return `${timestamp}${random}`;
 };
 
-// Получение токенов с Auth Server
-const getTokensFromAuthServer = async (loginToken) => {
+const sendLoginTokenToAuthServer = async (loginToken, provider, userId) => {
   try {
-    console.log('📥 Проверка токенов на Auth Server для login_token:', loginToken?.substring(0, 10) + '...');
+    const authUrl = `${AUTH_SERVER_URL}/auth?provider=${encodeURIComponent(provider)}&login_token=${encodeURIComponent(loginToken)}&user_ID=${encodeURIComponent(userId)}`;
     
-    const response = await fetch(`${AUTH_SERVER_URL}/check?login_token=${encodeURIComponent(loginToken)}`, {
+    const response = await fetch(authUrl, {
+      method: 'GET',
+      headers: { 
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      mode: 'cors'
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      
+      if (data.auth_url) {
+        return {
+          success: true,
+          auth_url: data.auth_url,
+          oauth_state: data.oauth_state || '',
+          data: data
+        };
+      } else if (data.code) {
+        return {
+          success: true,
+          auth_code: data.code,
+          expires_in: data.expires_in || 60,
+          data: data
+        };
+      } else {
+        return {
+          success: false,
+          error: 'В ответе отсутствует auth_url или code'
+        };
+      }
+    } else {
+      const errorText = await response.text();
+      return {
+        success: false,
+        error: `Ошибка сервера: ${response.status} - ${errorText}`
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Ошибка сети: ${error.message}`
+    };
+  }
+};
+
+// navigate("/personalaccount", { state: { userId } });
+
+
+const pollAuthStatus = async (loginToken, userId) => {
+  try {
+    const checkUrl = `${AUTH_SERVER_URL}/check?login_token=${encodeURIComponent(loginToken)}&user_id=${encodeURIComponent(userId)}`;
+    
+    const response = await fetch(checkUrl, {
       method: 'GET',
       headers: { 
         'Accept': 'application/json',
@@ -140,35 +161,39 @@ const getTokensFromAuthServer = async (loginToken) => {
 
     if (response.ok) {
       const data = await response.json();
-      console.log('📦 Ответ от Auth Server:', data);
       
-      if (data.status === 'granted' && data.access_token) {
+      if (data.status === 'granted') {
         return {
           accessToken: data.access_token,
           refreshToken: data.refresh_token || '',
-          userId: data.user_id || '',
-          provider: data.provider || 'unknown'
+          userId: data.user_id || userId,
+          provider: data.provider || 'unknown',
+          status: 'granted'
         };
       }
+      
+      return {
+        status: data.status,
+        provider: data.provider,
+        message: data.message || ''
+      };
     } else {
-      console.error('❌ Ошибка при запросе к Auth Server:', response.status);
+      const errorText = await response.text();
+      return {
+        status: 'error',
+        error: `Ошибка запроса: ${response.status}`
+      };
     }
-    return null;
   } catch (error) {
-    console.error('❌ Ошибка сети при получении токенов:', error);
-    return null;
+    return {
+      status: 'error',
+      error: error.message
+    };
   }
 };
 
-// СОЗДАНИЕ/ОБНОВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ В ФОРМАТЕ TELEGRAM БОТА
 const createOrUpdateUserInRedis = async (userId, loginToken, provider, isUpdate = false) => {
   try {
-    console.log('👤 Создание/обновление пользователя в Redis (формат Telegram)...');
-    console.log('   📋 User ID:', userId);
-    console.log('   🔑 Login Token:', loginToken.substring(0, 20) + '...');
-    console.log('   🏷️  Провайдер:', provider);
-    console.log('   🔄 Тип:', isUpdate ? 'Обновление' : 'Создание');
-    
     const endpoint = isUpdate ? '/api/user/update-token' : '/api/user/create';
     
     const response = await fetch(`${BACKEND_URL}${endpoint}`, {
@@ -188,7 +213,6 @@ const createOrUpdateUserInRedis = async (userId, loginToken, provider, isUpdate 
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Пользователь сохранен в Redis (формат Telegram):', result.message);
       return {
         success: true,
         userId: userId,
@@ -196,14 +220,12 @@ const createOrUpdateUserInRedis = async (userId, loginToken, provider, isUpdate 
       };
     } else {
       const errorText = await response.text();
-      console.error('❌ Ошибка сохранения пользователя в Redis:', errorText);
       return {
         success: false,
         error: errorText
       };
     }
   } catch (error) {
-    console.error('❌ Ошибка сети при сохранении пользователя:', error);
     return {
       success: false,
       error: error.message
@@ -211,14 +233,8 @@ const createOrUpdateUserInRedis = async (userId, loginToken, provider, isUpdate 
   }
 };
 
-// СОХРАНЕНИЕ AUTH ТОКЕНОВ ДЛЯ АВТОРИЗОВАННОГО ПОЛЬЗОВАТЕЛЯ
 const saveAuthTokensToRedis = async (userId, accessToken, refreshToken, provider) => {
   try {
-    console.log('🔐 Сохранение auth токенов для пользователя...');
-    console.log('   📋 User ID:', userId);
-    console.log('   🔑 Access Token:', accessToken.substring(0, 20) + '...');
-    console.log('   🏷️  Провайдер:', provider);
-    
     const response = await fetch(`${BACKEND_URL}/api/user/save-auth-tokens`, {
       method: 'POST',
       headers: {
@@ -237,21 +253,18 @@ const saveAuthTokensToRedis = async (userId, accessToken, refreshToken, provider
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Auth токены сохранены в Redis:', result.message);
       return {
         success: true,
         data: result
       };
     } else {
       const errorText = await response.text();
-      console.error('❌ Ошибка сохранения auth токенов в Redis:', errorText);
       return {
         success: false,
         error: errorText
       };
     }
   } catch (error) {
-    console.error('❌ Ошибка сети при сохранении auth токенов:', error);
     return {
       success: false,
       error: error.message
@@ -259,12 +272,8 @@ const saveAuthTokensToRedis = async (userId, accessToken, refreshToken, provider
   }
 };
 
-// ПОЛУЧЕНИЕ ДАННЫХ ПОЛЬЗОВАТЕЛЯ
 const getUserDataFromRedis = async (userId) => {
   try {
-    console.log('🔍 Получение данных пользователя из Redis...');
-    console.log('   📋 User ID:', userId);
-    
     const response = await fetch(`${BACKEND_URL}/api/user/${userId}`, {
       method: 'GET',
       headers: {
@@ -276,14 +285,12 @@ const getUserDataFromRedis = async (userId) => {
 
     if (response.ok) {
       const result = await response.json();
-      console.log('✅ Данные пользователя получены:', result.found ? 'Найден' : 'Не найден');
       return {
         success: true,
         found: result.found,
         data: result.data || {}
       };
     } else {
-      console.error('❌ Ошибка получения данных пользователя');
       return {
         success: false,
         found: false,
@@ -291,7 +298,6 @@ const getUserDataFromRedis = async (userId) => {
       };
     }
   } catch (error) {
-    console.error('❌ Ошибка сети при получении данных пользователя:', error);
     return {
       success: false,
       found: false,
@@ -300,59 +306,46 @@ const getUserDataFromRedis = async (userId) => {
   }
 };
 
-// Отправка loginToken на Auth Server
-// ВАЖНО: ЗАМЕНИТЕ существующую функцию sendLoginTokenToAuthServer на эту:
-
-// Отправка loginToken на Auth Server (использует существующий /auth эндпоинт)
-const sendLoginTokenToAuthServer = async (loginToken, provider) => {
-  try {
-    console.log('📤 Отправка loginToken на Auth Server через /auth эндпоинт...');
-    console.log('   🔑 Login Token:', loginToken.substring(0, 20) + '...');
-    console.log('   🏷️  Провайдер:', provider);
+const openAuthUrl = (authUrl) => {
+  const authWindow = window.open(
+    authUrl, 
+    'authWindow',
+    'width=600,height=700,scrollbars=yes,resizable=yes'
+  );
+  
+  if (!authWindow) {
+    localStorage.setItem('pending_auth_url', authUrl);
     
-    // Используем GET запрос на /auth эндпоинт
-    const authUrl = `${AUTH_SERVER_URL}/auth?provider=${encodeURIComponent(provider)}&login_token=${encodeURIComponent(loginToken)}`;
-    console.log(`📡 Запрос к: ${authUrl}`);
+    const userConfirmed = window.confirm(
+      'Не удалось открыть окно авторизации автоматически. ' +
+      '1. Нажмите ОК для открытия в этом окне\n' +
+      '2. Нажмите Отмена для копирования ссылки'
+    );
     
-    const response = await fetch(authUrl, {
-      method: 'GET',
-      headers: { 
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      mode: 'cors'
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log('✅ LoginToken успешно зарегистрирован на Auth Server:', data);
-      return data; // Возвращаем данные с auth_url и state
+    if (userConfirmed) {
+      window.location.href = authUrl;
+      return null;
     } else {
-      const errorText = await response.text();
-      console.error('❌ Ошибка при регистрации loginToken на Auth Server:', response.status, errorText);
+      navigator.clipboard.writeText(authUrl).then(() => {
+        alert('Ссылка скопирована в буфер обмена! Вставьте её в адресную строку браузера.');
+      }).catch(() => {
+        prompt('Скопируйте эту ссылку вручную:', authUrl);
+      });
       return null;
     }
-  } catch (error) {
-    console.error('❌ Ошибка сети при отправке loginToken:', error);
-    return null;
   }
+  
+  return authWindow;
 };
 
-// 📌 ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ ИЛИ ПОЛУЧЕНИЯ USER ID
 const getOrGenerateUserId = () => {
-  // Пробуем получить из localStorage
   const storedUserId = localStorage.getItem('tg_user_id');
   
   if (storedUserId) {
-    console.log('🎯 Используем сохраненный User ID из localStorage:', storedUserId);
     return storedUserId;
   }
   
-  // Генерируем новый
   const newUserId = generateUserId();
-  console.log('🆕 Сгенерирован новый User ID:', newUserId);
-  
-  // Сохраняем в localStorage
   localStorage.setItem('tg_user_id', newUserId);
   
   return newUserId;
@@ -362,8 +355,6 @@ function Login({ type, hasExistingSession = false, authState = null }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [currentProvider, setCurrentProvider] = useState(type || '');
-  const [scenarioSteps, setScenarioSteps] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(null);
   
   const hasStartedRef = useRef(false);
   const navigate = useNavigate();
@@ -372,313 +363,82 @@ function Login({ type, hasExistingSession = false, authState = null }) {
   const code = searchParams.get('code');
   const state = searchParams.get('state');
 
-  
-
-  // Добавляем шаг в сценарий
-  const addStep = (step, status = 'pending') => {
-    setScenarioSteps(prev => [...prev, { step, status, timestamp: new Date().toLocaleTimeString() }]);
-  };
-
-  // Обновляем статус шага
-  const updateStep = (index, status) => {
-    setScenarioSteps(prev => {
-      const newSteps = [...prev];
-      if (newSteps[index]) {
-        newSteps[index] = { ...newSteps[index], status };
-      }
-      return newSteps;
-    });
-  };
-
-  // ОПРОС СТАТУСА АВТОРИЗАЦИИ (новая версия)
-  const pollAuthStatus = async (loginToken, userId, provider) => {
-    console.log('🔄 Начинаем опрос статуса авторизации...');
-    addStep('🔄 Начинаем опрос статуса авторизации');
-    
-    let attempts = 0;
-    const maxAttempts = 60;
-    
-    return new Promise((resolve, reject) => {
-      const interval = setInterval(async () => {
-        attempts++;
+  useEffect(() => {
+    const handleCallback = async () => {
+      if (code && state && !loading) {
+        setLoading(true);
+        setStatus('Обработка данных авторизации...');
         
         try {
-          console.log(`📡 Опрос ${attempts}/${maxAttempts} для login_token: ${loginToken?.substring(0, 10)}...`);
+          const loginTokenForCheck = state;
+          const storedUserId = localStorage.getItem('tg_user_id');
           
-          const tokens = await getTokensFromAuthServer(loginToken);
-          
-          if (tokens) {
-            console.log('✅ Токены получены с Auth Server!');
-            clearInterval(interval);
+          if (loginTokenForCheck) {
+            setStatus('Проверяем статус авторизации...');
             
-            // Сохраняем auth токены в Redis (формат Telegram)
-            addStep('🔐 Сохраняем auth токены в Redis (формат Telegram)');
-            setStatus('Сохранение токенов авторизации...');
+            let attempts = 0;
+            const maxAttempts = 30;
             
-            const saved = await saveAuthTokensToRedis(
-              userId,
-              tokens.accessToken,
-              tokens.refreshToken,
-              provider
-            );
-            
-            if (saved.success) {
-              updateStep(scenarioSteps.length - 1, 'completed');
+            const pollInterval = setInterval(async () => {
+              attempts++;
               
-              console.log('✅✅✅ АВТОРИЗАЦИЯ ЗАВЕРШЕНА УСПЕШНО!');
-              console.log('   📋 User ID:', userId);
-              console.log('   🔑 Access Token:', tokens.accessToken.substring(0, 20) + '...');
-              console.log('   🏷️  Провайдер:', provider);
+              const tokens = await pollAuthStatus(loginTokenForCheck, storedUserId);
               
-              resolve({
-                ...tokens,
-                userId: userId,
-                provider: provider
-              });
-            } else {
-              updateStep(scenarioSteps.length - 1, 'error');
-              reject(new Error('Не удалось сохранить auth токены в Redis'));
-            }
-          } else if (attempts >= maxAttempts) {
-            clearInterval(interval);
-            console.log('⏱️ Время ожидания истекло');
-            addStep('❌ Время ожидания авторизации истекло', 'error');
-            reject(new Error('Время ожидания авторизации истекло'));
-          } else {
-            console.log('⏳ Авторизация еще не завершена...');
-            setStatus(`Ожидание авторизации... (${attempts}/${maxAttempts})`);
+              if (tokens.status === 'granted') {
+                clearInterval(pollInterval);
+                
+                const saveResult = await saveAuthTokensToRedis(
+                  tokens.userId,
+                  tokens.accessToken,
+                  tokens.refreshToken,
+                  tokens.provider
+                );
+                
+                if (saveResult.success) {
+                  setStatus('✅ Авторизация успешна! Перенаправление...');
+                  
+                  setTimeout(() => {
+                    const redirectUrl = `/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&user_id=${encodeURIComponent(tokens.userId)}&provider=${encodeURIComponent(tokens.provider)}&login_token=${encodeURIComponent(loginTokenForCheck)}`;
+                    navigate(redirectUrl);
+                  }, 1000);
+                } else {
+                  setStatus('❌ Ошибка сохранения токенов');
+                  setLoading(false);
+                }
+                
+              } else if (tokens.status === 'pending') {
+                setStatus(`Ожидание авторизации... (${attempts}/${maxAttempts})`);
+                
+                if (attempts >= maxAttempts) {
+                  clearInterval(pollInterval);
+                  setStatus('❌ Время ожидания истекло');
+                  setLoading(false);
+                }
+              } else if (tokens.status === 'denied' || tokens.status === 'expired') {
+                clearInterval(pollInterval);
+                setStatus(`❌ Авторизация отклонена: ${tokens.status}`);
+                setLoading(false);
+              } else if (tokens.status === 'error') {
+                clearInterval(pollInterval);
+                setStatus(`❌ Ошибка: ${tokens.error}`);
+                setLoading(false);
+              }
+            }, 2000);
           }
+          
         } catch (error) {
-          clearInterval(interval);
-          console.error('❌ Ошибка при опросе:', error);
-          reject(error);
+          setStatus(`❌ Ошибка: ${error.message}`);
+          setLoading(false);
         }
-      }, 3000);
-    });
-  };
-
-  // ОСНОВНОЙ ОБРАБОТЧИК АВТОРИЗАЦИИ (новая версия - формат Telegram)
-// ОСНОВНОЙ ОБРАБОТЧИК АВТОРИЗАЦИИ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
-const handleAuth = async (provider) => {
-  if (hasStartedRef.current || loading) {
-    console.log('⚠️ Auth already started, ignoring');
-    return;
-  }
-  
-  console.log(`🚀 Starting auth for: ${provider} (формат Telegram)`);
-  
-  hasStartedRef.current = true;
-  setLoading(true);
-  setCurrentProvider(provider);
-  
-  try {
-    // 1. Получаем или генерируем User ID
-    console.log('\n🔧 ШАГ 1: Получаем/генерируем User ID');
-    addStep('🆔 Получаем/генерируем User ID');
-    
-    const userId = getOrGenerateUserId();
-    setCurrentUserId(userId);
-    
-    console.log('   📋 User ID:', userId);
-    updateStep(scenarioSteps.length - 1, 'completed');
-    
-    // 2. Генерируем loginToken
-    console.log('\n🔧 ШАГ 2: Генерируем loginToken');
-    addStep('🔑 Генерируем loginToken');
-    
-    const loginToken = generateToken();
-    console.log('   🔑 Login Token:', loginToken.substring(0, 20) + '...');
-    updateStep(scenarioSteps.length - 1, 'completed');
-    
-    // 3. Проверяем, существует ли уже пользователь
-    console.log('\n🔧 ШАГ 3: Проверяем существование пользователя');
-    addStep('🔍 Проверяем существование пользователя');
-    
-    const userCheck = await getUserDataFromRedis(userId);
-    
-    let isUpdate = false;
-    if (userCheck.success && userCheck.found) {
-      console.log('   ✅ Пользователь уже существует в Redis');
-      isUpdate = true;
-    } else {
-      console.log('   🆕 Пользователь не найден, будет создан новый');
-    }
-    updateStep(scenarioSteps.length - 1, 'completed');
-    
-    // 4. Создаем/обновляем пользователя в Redis
-    console.log('\n🔧 ШАГ 4: Создаем/обновляем пользователя в Redis');
-    addStep(isUpdate ? '🔄 Обновляем пользователя в Redis' : '👤 Создаем пользователя в Redis');
-    setStatus(isUpdate ? 'Обновление пользователя...' : 'Создание пользователя...');
-    
-    const userResult = await createOrUpdateUserInRedis(userId, loginToken, provider, isUpdate);
-    
-    if (!userResult.success) {
-      throw new Error(`Ошибка при ${isUpdate ? 'обновлении' : 'создании'} пользователя: ${userResult.error}`);
-    }
-    
-    console.log(`   ✅ Пользователь ${isUpdate ? 'обновлен' : 'создан'} в Redis`);
-    updateStep(scenarioSteps.length - 1, 'completed');
-    
-    // 5. Отправляем loginToken на Auth Server и получаем auth_url
-    console.log('\n🔧 ШАГ 5: Отправляем loginToken на Auth Server');
-    addStep('📤 Отправляем loginToken на Auth Server');
-    setStatus('Регистрация токена на сервере авторизации...');
-    
-    const authResponse = await sendLoginTokenToAuthServer(loginToken, provider);
-    
-    if (!authResponse) {
-      throw new Error('Не удалось получить ответ от Auth Server');
-    }
-    
-    console.log('✅ Ответ от Auth Server получен:', authResponse);
-    updateStep(scenarioSteps.length - 1, 'completed');
-    
-    // 6. Перенаправление на провайдера
-    console.log('\n🔧 ШАГ 6: Перенаправление на провайдера');
-    addStep('🔄 Перенаправление на провайдера');
-    
-    if (authResponse.auth_url) {
-      console.log('🔄 Перенаправление на:', authResponse.auth_url);
-      setStatus('Перенаправление на провайдера...');
-      updateStep(scenarioSteps.length - 1, 'completed');
-      
-      // Сохраняем данные для обработки callback
-      localStorage.setItem('tg_current_login_token', loginToken);
-      localStorage.setItem('tg_current_user_id', userId);
-      localStorage.setItem('tg_current_provider', provider);
-      
-      // Даем немного времени для отображения статуса перед редиректом
-      setTimeout(() => {
-        window.location.href = authResponse.auth_url;
-      }, 1500);
-      
-    } else if (authResponse.code) {
-      // Для code auth показываем код
-      console.log('📱 Code auth, показываем код:', authResponse.code);
-      updateStep(scenarioSteps.length - 1, 'completed');
-      setStatus(`Код для ввода: ${authResponse.code}`);
-      
-      // Для code auth сразу начинаем опрос
-      addStep('🔄 Начинаем опрос Auth Server для получения токенов');
-      
-      const tokens = await pollAuthStatus(loginToken, userId, provider);
-      
-      addStep('✅ Auth токены успешно получены и сохранены', 'completed');
-      setStatus('Авторизация успешна! Перенаправление...');
-      
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
-      
-    } else {
-      console.log('ℹ️ Ответ от auth сервера:', authResponse);
-      updateStep(scenarioSteps.length - 1, 'completed');
-      setStatus('Готово! Возвращаемся на главную...');
-      
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
-    }
-    
-    console.log('\n✅✅✅ СЦЕНАРИЙ ВЫПОЛНЕН УСПЕШНО! ✅✅✅');
-    console.log('   📋 User ID:', userId);
-    console.log('   🔑 Login Token:', loginToken.substring(0, 20) + '...');
-    console.log('   🏷️  Провайдер:', provider);
-    console.log('════════════════════════════════════════\n');
-    
-  } catch (error) {
-    console.error('❌ Auth error:', error);
-    setStatus(`❌ Ошибка: ${error.message}`);
-    addStep(`❌ Ошибка: ${error.message}`, 'error');
-    
-    setTimeout(() => {
-      hasStartedRef.current = false;
-      setLoading(false);
-      setCurrentProvider('');
-      setCurrentUserId(null);
-      setStatus('');
-      navigate('/');
-    }, 3000);
-  }
-};
-
-  // ОБРАБОТКА CALLBACK'А ПОСЛЕ ВОЗВРАТА С ПРОВАЙДЕРА (новая версия)
-// ОБРАБОТКА CALLBACK'А ПОСЛЕ ВОЗВРАТА С ПРОВАЙДЕРА (ИСПРАВЛЕННАЯ ВЕРСИЯ)
-useEffect(() => {
-  const handleCallback = async () => {
-    if (code && state && !loading) {
-      console.log('🔄 ОБРАБОТКА CALLBACK С ПРОВАЙДЕРА (формат Telegram)');
-      console.log('📌 Code из URL:', code);
-      console.log('📌 State из URL:', state.substring(0, 20) + '...');
-      
-      const savedLoginToken = localStorage.getItem('tg_current_login_token') || state;
-      const savedUserId = localStorage.getItem('tg_current_user_id');
-      const savedProvider = localStorage.getItem('tg_current_provider');
-      
-      // Используем state как login_token для проверки на сервере
-      // Это важно: сервер ищет сессию по login_token
-      const loginTokenForCheck = state;
-      
-      setLoading(true);
-      setCurrentProvider(savedProvider || 'unknown');
-      setCurrentUserId(savedUserId || 'unknown');
-      
-      setScenarioSteps([
-        { step: '🔄 СЦЕНАРИЙ: Обработка callback с провайдера', status: 'completed', timestamp: new Date().toLocaleTimeString() },
-        { step: `📌 Получен callback с code: ${code.substring(0, 10)}...`, status: 'completed', timestamp: new Date().toLocaleTimeString() },
-        { step: `📌 State: ${state.substring(0, 10)}...`, status: 'completed', timestamp: new Date().toLocaleTimeString() },
-        { step: `🆔 User ID: ${savedUserId || 'не найден'}`, status: 'completed', timestamp: new Date().toLocaleTimeString() }
-      ]);
-      
-      try {
-        addStep('🔄 Начинаем опрос Auth Server для получения токенов');
-        
-        // Используем state как login_token для проверки
-       const tokens = await pollAuthStatus(savedLoginToken, savedUserId || 'unknown', savedProvider || 'unknown');
-        
-        addStep('✅ Auth токены успешно получены и сохранены', 'completed');
-        setStatus('Авторизация успешна! Перенаправление...');
-        
-        // Очищаем временные данные
-        localStorage.removeItem('tg_current_login_token');
-        localStorage.removeItem('tg_current_user_id');
-        localStorage.removeItem('tg_current_provider');
-        
-        // Сохраняем куки
-        document.cookie = `access_token=${tokens.accessToken}; path=/; max-age=86400`;
-        document.cookie = `user_id=${tokens.userId}; path=/; max-age=86400`;
-        document.cookie = `auth_provider=${tokens.provider}; path=/; max-age=86400`;
-        
-        console.log('✅ АВТОРИЗАЦИЯ ЗАВЕРШЕНА УСПЕШНО!');
-        console.log('   📋 User ID:', tokens.userId);
-        console.log('   🔑 Access Token:', tokens.accessToken.substring(0, 20) + '...');
-        
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
-        
-      } catch (error) {
-        console.error('❌ Ошибка при обработке callback:', error);
-        addStep(`❌ Ошибка: ${error.message}`, 'error');
-        setStatus(`Ошибка: ${error.message}`);
-        
-        setTimeout(() => {
-          navigate('/');
-        }, 3000);
-      } finally {
-        setLoading(false);
       }
-    }
-  };
-  
-  handleCallback();
-}, [code, state, navigate]);
+    };
+    
+    handleCallback();
+  }, [code, state, navigate]);
 
-  // Автоматический запуск сценария
   useEffect(() => {
     const provider = type || urlType;
     if (provider && !loading && !hasStartedRef.current && !state) {
-      console.log(`🔄 Автоматический запуск сценария для: ${provider} (формат Telegram)`);
       handleAuth(provider);
     }
   }, [type, urlType, state]);
@@ -695,160 +455,167 @@ useEffect(() => {
 
   const activeType = type || urlType;
 
+  const handleAuth = async (provider) => {
+    if (hasStartedRef.current || loading) {
+      return;
+    }
+    
+    hasStartedRef.current = true;
+    setLoading(true);
+    setCurrentProvider(provider);
+    
+    try {
+      const userId = getOrGenerateUserId();
+      
+      const generatedLoginToken = generateToken();
+      
+      const userCheck = await getUserDataFromRedis(userId);
+      
+      let isUpdate = false;
+      if (userCheck.success && userCheck.found) {
+        isUpdate = true;
+      }
+      
+      setStatus(isUpdate ? 'Обновление пользователя...' : 'Создание пользователя...');
+      
+      const userResult = await createOrUpdateUserInRedis(userId, generatedLoginToken, provider, isUpdate);
+      
+      if (!userResult.success) {
+        throw new Error(`Ошибка при ${isUpdate ? 'обновлении' : 'создании'} пользователя: ${userResult.error}`);
+      }
+      
+      setStatus('Получение URL авторизации...');
+      
+      const authResponse = await sendLoginTokenToAuthServer(generatedLoginToken, provider, userId);
+      
+      if (!authResponse.success) {
+        throw new Error(`Не удалось получить URL авторизации: ${authResponse.error}`);
+      }
+      
+      if (authResponse.auth_url) {
+        setStatus(`Получен URL для ${provider}. Открываем окно авторизации...`);
+        
+        localStorage.setItem('tg_current_login_token', generatedLoginToken);
+        localStorage.setItem('tg_current_user_id', userId);
+        localStorage.setItem('tg_current_provider', provider);
+        localStorage.setItem('tg_oauth_state', authResponse.oauth_state || '');
+        
+        setTimeout(() => {
+          const authWindow = openAuthUrl(authResponse.auth_url);
+          
+          if (authWindow) {
+            setStatus('Ожидайте завершения авторизации в открывшемся окне...');
+            
+            const checkWindow = setInterval(() => {
+              if (authWindow.closed) {
+                clearInterval(checkWindow);
+                setStatus('Окно авторизации закрыто. Проверяем статус...');
+                
+                setTimeout(async () => {
+                  const tokens = await pollAuthStatus(generatedLoginToken, userId);
+                  
+                  if (tokens.status === 'granted') {
+                    const saveResult = await saveAuthTokensToRedis(
+                      userId,
+                      tokens.accessToken,
+                      tokens.refreshToken,
+                      provider
+                    );
+                    
+                    if (saveResult.success) {
+                      setStatus('✅ Авторизация успешна! Перенаправление...');
+                      
+                      setTimeout(() => {
+                        const redirectUrl = `/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&user_id=${encodeURIComponent(userId)}&provider=${encodeURIComponent(provider)}&login_token=${encodeURIComponent(generatedLoginToken)}`;
+                        navigate(redirectUrl);
+                      }, 1000);
+                    } else {
+                      setStatus('❌ Ошибка сохранения токенов');
+                      setLoading(false);
+                      hasStartedRef.current = false;
+                    }
+                    
+                  } else {
+                    setStatus('❌ Авторизация не завершена. Попробуйте снова.');
+                    setLoading(false);
+                    hasStartedRef.current = false;
+                  }
+                }, 1000);
+              }
+            }, 500);
+          } else {
+            setStatus('Используйте предложенные альтернативные способы авторизации');
+            setLoading(false);
+            hasStartedRef.current = false;
+          }
+        }, 1500);
+        
+      } else if (authResponse.auth_code) {
+        setStatus(`Код для авторизации: ${authResponse.auth_code}`);
+        
+        setStatus('Ожидаем подтверждения кода...');
+        
+        let attempts = 0;
+        const maxAttempts = 30;
+        
+        const pollInterval = setInterval(async () => {
+          attempts++;
+          
+          const tokens = await pollAuthStatus(generatedLoginToken, userId);
+          
+          if (tokens.status === 'granted') {
+            clearInterval(pollInterval);
+            
+            const saveResult = await saveAuthTokensToRedis(
+              userId,
+              tokens.accessToken,
+              tokens.refreshToken,
+              provider
+            );
+            
+            if (saveResult.success) {
+              setStatus('✅ Авторизация успешна! Перенаправление...');
+              
+              setTimeout(() => {
+                const redirectUrl = `/?access_token=${encodeURIComponent(tokens.accessToken)}&refresh_token=${encodeURIComponent(tokens.refreshToken)}&user_id=${encodeURIComponent(userId)}&provider=${encodeURIComponent(provider)}&login_token=${encodeURIComponent(generatedLoginToken)}`;
+                navigate(redirectUrl);
+              }, 1000);
+            } else {
+              setStatus('❌ Ошибка сохранения токенов');
+              setLoading(false);
+              hasStartedRef.current = false;
+            }
+            
+          } else if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            setStatus('❌ Время ожидания истекло');
+            setLoading(false);
+            hasStartedRef.current = false;
+          }
+        }, 2000);
+        
+      } else {
+        throw new Error('Непредвиденный ответ от сервера авторизации');
+      }
+      
+    } catch (error) {
+      setStatus(`❌ Ошибка: ${error.message}`);
+      
+      setTimeout(() => {
+        hasStartedRef.current = false;
+        setLoading(false);
+        setCurrentProvider('');
+        setStatus('');
+        navigate('/');
+      }, 3000);
+    }
+  };
+
   return (
     <Body>
       <Title>Выберите способ входа</Title>
       
-      {state ? (
-        <>
-          <ScenarioInfo>
-            <h4 style={{ marginTop: 0, color: '#F39C12', fontSize: '14px' }}>
-              🔄 Обработка callback с провайдера
-            </h4>
-            {currentUserId && (
-              <div style={{ 
-                backgroundColor: '#34495E', 
-                padding: '5px 10px', 
-                borderRadius: '5px',
-                marginBottom: '10px',
-                fontSize: '11px'
-              }}>
-                🆔 User ID: <strong>{currentUserId}</strong>
-              </div>
-            )}
-            <StepList>
-              {scenarioSteps.map((step, index) => (
-                <StepItem 
-                  key={index}
-                  style={{
-                    color: step.status === 'completed' ? '#2ECC71' : 
-                          step.status === 'error' ? '#E74C3C' : 
-                          step.status === 'warning' ? '#F39C12' : '#BDC3C7',
-                    fontWeight: step.status === 'completed' ? 'bold' : 'normal',
-                    opacity: step.status === 'completed' ? 1 : 0.9
-                  }}
-                >
-                  {step.step} 
-                  <span style={{ fontSize: '10px', marginLeft: '10px', color: '#7F8C8D' }}>
-                    {step.timestamp}
-                  </span>
-                  {step.status === 'completed' && ' ✅'}
-                  {step.status === 'error' && ' ❌'}
-                  {step.status === 'warning' && ' ⚠️'}
-                </StepItem>
-              ))}
-            </StepList>
-            
-            {loading && (
-              <div style={{
-                marginTop: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                fontSize: '11px',
-                color: '#BDC3C7'
-              }}>
-                <div style={{
-                  width: '20px',
-                  height: '20px',
-                  border: '2px solid #F39C12',
-                  borderTopColor: 'transparent',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }}></div>
-                Ожидание токенов с Auth Server...
-              </div>
-            )}
-          </ScenarioInfo>
-          
-          <Status>
-            <strong>Статус:</strong> {status || `Обработка авторизации...`}
-            {loading && <div style={{ fontSize: '10px', marginTop: '5px' }}>⏳ Опрашиваем Auth Server...</div>}
-            {state && (
-              <>
-                <div style={{ fontSize: '10px', marginTop: '5px', color: '#7F8C8D' }}>
-                  📌 State из URL: {state.substring(0, 20)}...
-                </div>
-                {currentUserId && (
-                  <div style={{ fontSize: '10px', marginTop: '5px', color: '#2C3E50' }}>
-                    🆔 User ID: {currentUserId}
-                  </div>
-                )}
-              </>
-            )}
-          </Status>
-        </>
-      ) : activeType ? (
-        <>
-          <ScenarioInfo>
-            <h4 style={{ marginTop: 0, color: '#F39C12', fontSize: '14px' }}>
-              🎯 Выполняется сценарий для: {activeType.toUpperCase()}
-            </h4>
-            {currentUserId && (
-              <div style={{ 
-                backgroundColor: '#34495E', 
-                padding: '5px 10px', 
-                borderRadius: '5px',
-                marginBottom: '10px',
-                fontSize: '11px'
-              }}>
-                🆔 User ID: <strong>{currentUserId}</strong>
-              </div>
-            )}
-            <StepList>
-              {scenarioSteps.map((step, index) => (
-                <StepItem 
-                  key={index}
-                  style={{
-                    color: step.status === 'completed' ? '#2ECC71' : 
-                          step.status === 'error' ? '#E74C3C' : '#BDC3C7',
-                    fontWeight: step.status === 'completed' ? 'bold' : 'normal',
-                    opacity: step.status === 'completed' ? 1 : 0.9
-                  }}
-                >
-                  {step.step} 
-                  <span style={{ fontSize: '10px', marginLeft: '10px', color: '#7F8C8D' }}>
-                    {step.timestamp}
-                  </span>
-                  {step.status === 'completed' && ' ✅'}
-                  {step.status === 'error' && ' ❌'}
-                </StepItem>
-              ))}
-            </StepList>
-            
-            {loading && (
-              <div style={{
-                marginTop: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                fontSize: '11px',
-                color: '#BDC3C7'
-              }}>
-                <div style={{
-                  width: '20px',
-                  height: '20px',
-                  border: '2px solid #F39C12',
-                  borderTopColor: 'transparent',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }}></div>
-                Выполняется сценарий...
-              </div>
-            )}
-          </ScenarioInfo>
-          
-          <Status>
-            <strong>Статус:</strong> {status || `Обработка ${activeType}`}
-            {loading && <div style={{ fontSize: '10px', marginTop: '5px' }}>⏳ Выполняется...</div>}
-            {currentUserId && (
-              <div style={{ fontSize: '10px', marginTop: '5px', color: '#2C3E50' }}>
-                🆔 User ID: {currentUserId}
-              </div>
-            )}
-          </Status>
-        </>
-      ) : (
+      {!activeType ? (
         <>
           <ButtonGrid>
             <Button 
@@ -883,12 +650,52 @@ useEffect(() => {
           </div>
           
           <Status>
-            Выберите способ авторизации
-            <div style={{ fontSize: '10px', marginTop: '5px' }}>🎯 Клик → переход на /login?type=...</div>
-            <div style={{ fontSize: '10px', color: '#7F8C8D' }}>📌 Данные сохраняются в формате Telegram бота</div>
-            <div style={{ fontSize: '10px', color: '#7F8C8D' }}>🔑 Структура Redis: <strong>user:USER_ID → данные</strong></div>
+            {status || 'Выберите способ авторизации'}
+            {loading && (
+              <div style={{ 
+                marginTop: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                color:'black',
+              }}>
+                <div style={{
+                  width: '20px',
+                  height: '20px',
+                  border: '2px solid #F39C12',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                Загрузка...
+              </div>
+            )}
           </Status>
         </>
+      ) : (
+        <Status>
+          <strong>Статус:</strong> {status || `Обработка ${activeType}`}
+          {loading && (
+            <div style={{ 
+              marginTop: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px'
+            }}>
+              <div style={{
+                width: '20px',
+                height: '20px',
+                border: '2px solid #F39C12',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+              Выполняется авторизация...
+            </div>
+          )}
+        </Status>
       )}
       
       <style>{`

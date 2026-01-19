@@ -5,7 +5,6 @@ import cookieParser from 'cookie-parser';
 const app = express();
 const PORT = 3007;
 
-// CORS настройка
 app.use((req, res, next) => {
   const allowedOrigins = [
     'http://localhost:5173',
@@ -36,17 +35,10 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(cookieParser());
 
-// Логирование запросов
 app.use((req, res, next) => {
-  console.log('════════════════════════════════════════');
-  console.log(`📨 ${new Date().toLocaleTimeString()} ${req.method} ${req.url}`);
-  console.log(`📌 Origin: ${req.headers.origin || 'none'}`);
-  console.log(`🍪 Cookies:`, req.cookies);
-  console.log('════════════════════════════════════════');
   next();
 });
 
-// Подключение к Redis
 let redisClient;
 
 const connectRedis = async () => {
@@ -56,25 +48,20 @@ const connectRedis = async () => {
     });
 
     redisClient.on('error', (err) => {
-      console.error('❌ Ошибка Redis:', err);
     });
 
     redisClient.on('connect', () => {
-      console.log('✅ Подключено к Redis');
     });
 
     await redisClient.connect();
     return true;
   } catch (error) {
-    console.error('❌ Ошибка подключения к Redis:', error);
     return false;
   }
 };
 
-// Подключаемся к Redis при старте
 connectRedis();
 
-// 📌 Вспомогательные функции
 const normalizeSessionToken = (token) => {
   if (!token) return null;
   return token.replace(/^session:/, '');
@@ -89,58 +76,37 @@ const getUserKey = (userId) => {
   return `user:${userId}`;
 };
 
-// 📌 СОЗДАНИЕ ПОЛЬЗОВАТЕЛЯ В ФОРМАТЕ TELEGRAM БОТА
 app.post('/api/user/create', async (req, res) => {
   try {
-    console.log('📨 ПОЛУЧЕН ЗАПРОС НА СОЗДАНИЕ ПОЛЬЗОВАТЕЛЯ');
-    
     const { userId, loginToken, provider } = req.body;
     
     if (!userId || !loginToken) {
-      console.log('❌ Ошибка: userId и loginToken обязательны');
       return res.status(400).json({ 
         success: false, 
         error: 'userId и loginToken обязательны' 
       });
     }
     
-    console.log('🆕 СОЗДАНИЕ ПОЛЬЗОВАТЕЛЯ В REDIS:');
-    console.log('   🔑 Ключ:', `user:${userId}`);
-    console.log('   💾 Login Token:', loginToken.substring(0, 20) + '...');
-    console.log('   🏷️  Провайдер:', provider || 'unknown');
-    
     if (!redisClient || !redisClient.isOpen) {
-      console.log('❌ Redis не подключен');
       return res.status(500).json({ 
         success: false, 
         error: 'Redis недоступен' 
       });
     }
     
-    // ✅ ФОРМАТ КАК У TELEGRAM БОТА
     const userData = {
-      status: "anonymous", // или "authenticated" после успешной авторизации
+      status: "anonymous",
       login_token: loginToken,
       provider: provider || 'unknown',
-      created_at: Date.now() / 1000, // Unix timestamp в секундах
+      created_at: Date.now() / 1000,
       last_active: Date.now() / 1000
     };
     
     const userKey = getUserKey(userId);
     
     try {
-      // TTL 24 часа (86400 секунд)
       await redisClient.setEx(userKey, 86400, JSON.stringify(userData));
-      console.log('✅ Пользователь сохранен в Redis');
-      console.log('   💾 Ключ:', userKey);
-      console.log('   💾 Данные:', {
-        status: userData.status,
-        login_token: userData.login_token.substring(0, 20) + '...',
-        created_at: userData.created_at
-      });
-      
     } catch (redisError) {
-      console.error('❌ Ошибка Redis при сохранении:', redisError);
       throw redisError;
     }
     
@@ -153,7 +119,6 @@ app.post('/api/user/create', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Ошибка при создании пользователя:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -161,27 +126,18 @@ app.post('/api/user/create', async (req, res) => {
   }
 });
 
-// 📌 ОБНОВЛЕНИЕ TOKEN ДЛЯ СУЩЕСТВУЮЩЕГО ПОЛЬЗОВАТЕЛЯ
 app.post('/api/user/update-token', async (req, res) => {
   try {
-    console.log('📨 ПОЛУЧЕН ЗАПРОС НА ОБНОВЛЕНИЕ ТОКЕНА ПОЛЬЗОВАТЕЛЯ');
-    
     const { userId, loginToken, provider } = req.body;
     
     if (!userId || !loginToken) {
-      console.log('❌ Ошибка: userId и loginToken обязательны');
       return res.status(400).json({ 
         success: false, 
         error: 'userId и loginToken обязательны' 
       });
     }
     
-    console.log('🔄 ОБНОВЛЕНИЕ ПОЛЬЗОВАТЕЛЯ В REDIS:');
-    console.log('   🔑 Ключ:', `user:${userId}`);
-    console.log('   💾 Новый Login Token:', loginToken.substring(0, 20) + '...');
-    
     if (!redisClient || !redisClient.isOpen) {
-      console.log('❌ Redis не подключен');
       return res.status(500).json({ 
         success: false, 
         error: 'Redis недоступен' 
@@ -190,12 +146,9 @@ app.post('/api/user/update-token', async (req, res) => {
     
     const userKey = getUserKey(userId);
     
-    // Получаем существующие данные пользователя
     const existingData = await redisClient.get(userKey);
     
     if (!existingData) {
-      console.log('⚠️ Пользователь не найден, создаем нового');
-      
       const userData = {
         status: "anonymous",
         login_token: loginToken,
@@ -216,12 +169,10 @@ app.post('/api/user/update-token', async (req, res) => {
       });
     }
     
-    // Обновляем существующего пользователя
     let userData;
     try {
       userData = JSON.parse(existingData);
     } catch (e) {
-      console.log('⚠️ Ошибка парсинга, создаем новую структуру');
       userData = {
         status: "anonymous",
         login_token: loginToken,
@@ -231,22 +182,13 @@ app.post('/api/user/update-token', async (req, res) => {
       };
     }
     
-    // Обновляем поля
     userData.login_token = loginToken;
     userData.last_active = Date.now() / 1000;
     if (provider) {
       userData.provider = provider;
     }
     
-    // Сохраняем обновленные данные
     await redisClient.setEx(userKey, 86400, JSON.stringify(userData));
-    
-    console.log('✅ Токен пользователя обновлен');
-    console.log('   💾 Обновленные данные:', {
-      status: userData.status,
-      login_token: userData.login_token.substring(0, 20) + '...',
-      last_active: userData.last_active
-    });
     
     res.json({
       success: true,
@@ -258,7 +200,6 @@ app.post('/api/user/update-token', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Ошибка при обновлении токена пользователя:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -266,27 +207,18 @@ app.post('/api/user/update-token', async (req, res) => {
   }
 });
 
-// 📌 СОХРАНЕНИЕ ACCESS TOKEN ДЛЯ АВТОРИЗОВАННОГО ПОЛЬЗОВАТЕЛЯ
 app.post('/api/user/save-auth-tokens', async (req, res) => {
   try {
-    console.log('📨 ПОЛУЧЕН ЗАПРОС НА СОХРАНЕНИЕ AUTH ТОКЕНОВ');
-    
     const { userId, accessToken, refreshToken, provider } = req.body;
     
     if (!userId || !accessToken) {
-      console.log('❌ Ошибка: userId и accessToken обязательны');
       return res.status(400).json({ 
         success: false, 
         error: 'userId и accessToken обязательны' 
       });
     }
     
-    console.log('🔐 СОХРАНЕНИЕ AUTH ТОКЕНОВ ДЛЯ ПОЛЬЗОВАТЕЛЯ:');
-    console.log('   🔑 User ID:', userId);
-    console.log('   🔑 Access Token:', accessToken.substring(0, 20) + '...');
-    
     if (!redisClient || !redisClient.isOpen) {
-      console.log('❌ Redis не подключен');
       return res.status(500).json({ 
         success: false, 
         error: 'Redis недоступен' 
@@ -295,7 +227,6 @@ app.post('/api/user/save-auth-tokens', async (req, res) => {
     
     const userKey = getUserKey(userId);
     
-    // Получаем существующие данные пользователя
     const existingData = await redisClient.get(userKey);
     
     let userData;
@@ -303,7 +234,6 @@ app.post('/api/user/save-auth-tokens', async (req, res) => {
       try {
         userData = JSON.parse(existingData);
       } catch (e) {
-        console.log('⚠️ Ошибка парсинга, создаем новую структуру');
         userData = {
           status: "authenticated",
           access_token: accessToken,
@@ -314,7 +244,6 @@ app.post('/api/user/save-auth-tokens', async (req, res) => {
         };
       }
     } else {
-      // Создаем нового пользователя
       userData = {
         status: "authenticated",
         access_token: accessToken,
@@ -325,7 +254,6 @@ app.post('/api/user/save-auth-tokens', async (req, res) => {
       };
     }
     
-    // Обновляем статус и токены
     userData.status = "authenticated";
     userData.access_token = accessToken;
     if (refreshToken) userData.refresh_token = refreshToken;
@@ -333,15 +261,7 @@ app.post('/api/user/save-auth-tokens', async (req, res) => {
     userData.auth_time = Date.now() / 1000;
     userData.last_active = Date.now() / 1000;
     
-    // Сохраняем обновленные данные
     await redisClient.setEx(userKey, 86400, JSON.stringify(userData));
-    
-    console.log('✅ Auth токены сохранены');
-    console.log('   💾 Обновленные данные:', {
-      status: userData.status,
-      access_token: userData.access_token.substring(0, 20) + '...',
-      auth_time: userData.auth_time
-    });
     
     res.json({
       success: true,
@@ -352,7 +272,6 @@ app.post('/api/user/save-auth-tokens', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Ошибка при сохранении auth токенов:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -360,12 +279,9 @@ app.post('/api/user/save-auth-tokens', async (req, res) => {
   }
 });
 
-// 📌 ПОЛУЧЕНИЕ ДАННЫХ ПОЛЬЗОВАТЕЛЯ
 app.get('/api/user/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    
-    console.log('🔍 ЗАПРОС ДАННЫХ ПОЛЬЗОВАТЕЛЯ:', userId);
     
     if (!redisClient || !redisClient.isOpen) {
       return res.status(500).json({ 
@@ -388,17 +304,6 @@ app.get('/api/user/:userId', async (req, res) => {
     try {
       const parsedData = JSON.parse(userData);
       
-      // Маскируем чувствительные данные для логов
-      const safeData = { ...parsedData };
-      if (safeData.login_token) {
-        safeData.login_token = safeData.login_token.substring(0, 10) + '...';
-      }
-      if (safeData.access_token) {
-        safeData.access_token = safeData.access_token.substring(0, 10) + '...';
-      }
-      
-      console.log('✅ Данные пользователя получены:', safeData);
-      
       res.json({
         success: true,
         found: true,
@@ -408,7 +313,6 @@ app.get('/api/user/:userId', async (req, res) => {
       });
       
     } catch (e) {
-      console.error('❌ Ошибка парсинга данных пользователя:', e);
       res.status(500).json({
         success: false,
         error: 'Ошибка обработки данных пользователя'
@@ -416,7 +320,6 @@ app.get('/api/user/:userId', async (req, res) => {
     }
     
   } catch (error) {
-    console.error('❌ Ошибка при получении данных пользователя:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -424,18 +327,98 @@ app.get('/api/user/:userId', async (req, res) => {
   }
 });
 
-// 📌 Проверка сессии (сохраняем для обратной совместимости)
+app.get('/api/session/user-id', async (req, res) => {
+  try {
+    const sessionToken = req.cookies.session_token;
+
+    if (!sessionToken) {
+      return res.status(401).json({ success: false, error: 'Нет session_token' });
+    }
+
+    if (!redisClient || !redisClient.isOpen) {
+      return res.status(500).json({ success: false, error: 'Redis недоступен' });
+    }
+
+    const sessionKey = `session:${sessionToken}`;
+    const loginToken = await redisClient.get(sessionKey);
+
+    if (!loginToken) {
+      return res.status(401).json({ success: false, error: 'Сессия не найдена/истекла' });
+    }
+
+    // ВАЖНО: лучше не делать keys('user:*') на проде, но пока повторим твою текущую логику
+    const userKeys = await redisClient.keys('user:*');
+
+    for (const userKey of userKeys) {
+      const userDataStr = await redisClient.get(userKey);
+      if (!userDataStr) continue;
+
+      try {
+        const userData = JSON.parse(userDataStr);
+        if (userData.login_token === loginToken) {
+          const userId = userKey.replace('user:', '');
+          return res.json({ success: true, userId });
+        }
+      } catch (e) {}
+    }
+
+    return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/user/any-id', async (req, res) => {
+  try {
+    if (!redisClient || !redisClient.isOpen) {
+      return res.status(500).json({ success: false, error: 'Redis недоступен' });
+    }
+
+    const keys = await redisClient.keys('user:*'); // вернет ["user:1768..."]
+    if (!keys.length) {
+      return res.status(404).json({ success: false, error: 'user:* ключи не найдены' });
+    }
+
+    const userId = keys[0].replace('user:', ''); // "1768..."
+    return res.json({ success: true, userId, key: keys[0] });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 app.get('/api/session/check', async (req, res) => {
   try {
-    // Получаем токен сессии из куки
     const sessionToken = req.cookies.session_token;
     
-    console.log('🔍 ПРОВЕРКА СЕССИИ (legacy):');
-    console.log('Токен сессии из куки:', sessionToken ? sessionToken.substring(0, 20) + '...' : 'НЕТ КУКИ');
+    const userIdFromQuery = req.query.user_id;
     
-    // Если куки нет - сразу отрицательный ответ
+    if (userIdFromQuery) {
+      const userKey = `user:${userIdFromQuery}`;
+      const userDataStr = await redisClient.get(userKey);
+      
+      if (userDataStr) {
+        try {
+          const userData = JSON.parse(userDataStr);
+          
+          if (userData.status === 'authenticated') {
+            return res.json({
+              authenticated: true,
+              status: 'authenticated',
+              sessionToken: sessionToken || null,
+              userId: userIdFromQuery,
+              provider: userData.provider,
+              loginToken: userData.login_token || null,
+              accessToken: userData.access_token || null,
+              refreshToken: userData.refresh_token || null,
+              foundBy: 'direct_user_id_check'
+            });
+          }
+        } catch (e) {
+        }
+      }
+    }
+    
     if (!sessionToken) {
-      console.log('❌ Кука session_token не найдена');
       return res.json({
         authenticated: false,
         status: 'anonymous',
@@ -443,9 +426,7 @@ app.get('/api/session/check', async (req, res) => {
       });
     }
     
-    // Проверяем подключение к Redis
     if (!redisClient || !redisClient.isOpen) {
-      console.log('⚠️ Redis не подключен');
       return res.json({
         authenticated: false,
         status: 'anonymous',
@@ -453,28 +434,20 @@ app.get('/api/session/check', async (req, res) => {
       });
     }
     
-    // ✅ КЛЮЧ В REDIS: session:токен_сессии
-    const sessionKey = getSessionKey(sessionToken);
-    console.log('🔑 Ключ для поиска в Redis:', sessionKey);
+    const sessionKey = `session:${sessionToken}`;
     
-    // ✅ ЗНАЧЕНИЕ В REDIS: токен_входа (простая строка)
     const loginToken = await redisClient.get(sessionKey);
     
     if (!loginToken) {
-      console.log('❌ Сессия не найдена в Redis');
-      
-      // Попробуем альтернативный поиск (для обратной совместимости)
-      console.log('🔍 Пробуем альтернативный поиск...');
       const altKeys = [
-        sessionToken, // Без изменений
-        `session:${sessionToken}`, // С префиксом
-        sessionToken.startsWith('session:') ? sessionToken.substring(7) : sessionToken // Без префикса
+        sessionToken,
+        `session:${sessionToken}`,
+        sessionToken.startsWith('session:') ? sessionToken.substring(7) : sessionToken
       ];
       
       for (const altKey of altKeys) {
         const altLoginToken = await redisClient.get(altKey);
         if (altLoginToken) {
-          console.log(`✅ Найдено по альтернативному ключу: ${altKey}`);
           return res.json({
             authenticated: true,
             status: 'anonymous',
@@ -493,89 +466,297 @@ app.get('/api/session/check', async (req, res) => {
       });
     }
     
-    console.log('✅✅✅ СЦЕНАРИЙ ВЫПОЛНЕН: ПОЛЬЗОВАТЕЛЬ С ТОКЕНОМ ЕСТЬ! ✅✅✅');
-    console.log('📊 Redis сообщает: такой ключ ЕСТЬ в базе');
-    console.log('📨 Redis прислал значение (токен входа):', loginToken.substring(0, 20) + '...');
+    const userKeys = await redisClient.keys('user:*');
+    let foundUser = null;
+    let foundUserId = null;
+    
+    for (const userKey of userKeys) {
+      const userDataStr = await redisClient.get(userKey);
+      if (userDataStr) {
+        try {
+          const userData = JSON.parse(userDataStr);
+          if (userData.login_token === loginToken) {
+            foundUserId = userKey.replace('user:', '');
+            foundUser = userData;
+            break;
+          }
+        } catch (e) {
+        }
+      }
+    }
+    
+    if (foundUser) {
+      return res.json({
+        authenticated: foundUser.status === 'authenticated',
+        status: foundUser.status || 'anonymous',
+        sessionToken: sessionToken,
+        userId: foundUserId,
+        provider: foundUser.provider,
+        loginToken: loginToken,
+        accessToken: foundUser.access_token || null,
+        refreshToken: foundUser.refresh_token || null,
+        foundBy: 'login_token_match'
+      });
+    }
     
     res.json({
       authenticated: true,
       status: 'anonymous',
-      sessionToken: normalizeSessionToken(sessionToken),
+      sessionToken: sessionToken,
       loginToken: loginToken,
-      foundBy: 'session_key'
+      foundBy: 'session_only'
     });
     
   } catch (error) {
-    console.error('❌ Ошибка при проверке сессии:', error);
     res.status(500).json({ error: error.message });
   }
 });
-
-// 📌 Создание новой сессии (сохраняем для обратной совместимости)
-app.post('/api/session/create', async (req, res) => {
+app.post('/api/session/logout', async (req, res) => {
   try {
-    console.log('📨 ПОЛУЧЕН ЗАПРОС НА СОЗДАНИЕ СЕССИИ (legacy)');
+    console.log('=== LOGOUT: УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ИЗ REDIS ===');
+    const sessionToken = req.cookies.session_token;
     
-    const { sessionToken, loginToken } = req.body;
-    
-    if (!sessionToken || !loginToken) {
-      console.log('❌ Ошибка: sessionToken и loginToken обязательны');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'sessionToken и loginToken обязательны' 
+    if (!sessionToken) {
+      console.log('Нет session_token в куках');
+      return res.json({
+        success: false,
+        message: 'Сессия не найдена (нет куки)'
       });
     }
     
-    // Нормализуем токен сессии (убираем префикс 'session:' если он есть)
-    const normalizedSessionToken = normalizeSessionToken(sessionToken);
-    
-    console.log('🆕 СОЗДАНИЕ НОВОЙ СЕССИИ В REDIS (legacy):');
-    console.log('   🔑 Исходный токен сессии:', sessionToken.substring(0, 20) + '...');
-    console.log('   🔑 Нормализованный токен сессии:', normalizedSessionToken.substring(0, 20) + '...');
-    console.log('   💾 Значение (токен входа):', loginToken.substring(0, 20) + '...');
-    
     if (!redisClient || !redisClient.isOpen) {
-      console.log('❌ Redis не подключен');
       return res.status(500).json({ 
         success: false, 
         error: 'Redis недоступен' 
       });
     }
     
-    // ✅ ПРАВИЛЬНАЯ СТРУКТУРА: ключ = session:нормализованный_токен_сессии, значение = токен_входа
-    const sessionKey = `session:${normalizedSessionToken}`;
+    console.log('Session token из куков:', sessionToken);
     
-    try {
-      // TTL 24 часа (86400 секунд)
-      await redisClient.setEx(sessionKey, 86400, loginToken);
-      console.log('✅ Сессия сохранена в Redis');
-      console.log('   💾 Ключ:', sessionKey);
-      console.log('   💾 Значение:', loginToken.substring(0, 20) + '...');
-      console.log('   ⏱️ Время жизни: 24 часа');
-      
-      // Проверяем что сохранилось
-      const savedValue = await redisClient.get(sessionKey);
-      if (savedValue === loginToken) {
-        console.log('✅ Подтверждение: значение сохранено корректно');
-      }
-      
-    } catch (redisError) {
-      console.error('❌ Ошибка Redis при сохранении:', redisError);
-      throw redisError;
-    }
+    // 1. Удаляем сессию
+    const sessionKey = `session:${sessionToken}`;
+    const deletedSession = await redisClient.del(sessionKey);
+    console.log(`Удалена сессия ${sessionKey}: ${deletedSession > 0 ? 'успешно' : 'не найдена'}`);
     
-    console.log('════════════════════════════════════════');
-    
-    // Устанавливаем куку session_token в браузер (сохраняем нормализованный токен)
-    res.cookie('session_token', normalizedSessionToken, {
+    // 2. Очищаем куки
+    res.clearCookie('session_token', {
       httpOnly: true,
       secure: false,
-      maxAge: 24 * 60 * 60 * 1000, // 24 часа
       sameSite: 'lax',
       path: '/'
     });
     
-    console.log('🍪 Кука session_token установлена в браузер:', normalizedSessionToken.substring(0, 20) + '...');
+    // 3. Ищем пользователя по session и удаляем его
+    let userIdToDelete = null;
+    let loginToken = null;
+    
+    // Пытаемся найти loginToken из сессии
+    const possibleKeys = [sessionKey, sessionToken];
+    for (const key of possibleKeys) {
+      const token = await redisClient.get(key);
+      if (token) {
+        loginToken = token;
+        console.log(`Найден loginToken из сессии ${key}: ${token}`);
+        break;
+      }
+    }
+    
+    if (loginToken) {
+      // Ищем пользователя с таким login_token
+      const userKeys = await redisClient.keys('user:*');
+      console.log(`Найдено пользователей: ${userKeys.length}`);
+      
+      for (const userKey of userKeys) {
+        try {
+          const userDataStr = await redisClient.get(userKey);
+          if (userDataStr) {
+            const userData = JSON.parse(userDataStr);
+            if (userData.login_token === loginToken) {
+              userIdToDelete = userKey.replace('user:', '');
+              
+              // УДАЛЯЕМ ПОЛЬЗОВАТЕЛЯ ПОЛНОСТЬЮ!
+              const deletedUser = await redisClient.del(userKey);
+              console.log(`🗑️ УДАЛЕН ПОЛЬЗОВАТЕЛЬ: ${userKey}, успешно: ${deletedUser > 0}`);
+              break;
+            }
+          }
+        } catch (e) {
+          console.error(`Ошибка обработки пользователя ${userKey}:`, e);
+        }
+      }
+    } else {
+      console.log('LoginToken не найден в сессии');
+    }
+    
+    // 4. Дополнительно: удаляем все session ключи для этого пользователя
+    const allSessionKeys = await redisClient.keys('session:*');
+    let deletedOtherSessions = 0;
+    
+    for (const key of allSessionKeys) {
+      const tokenValue = await redisClient.get(key);
+      if (tokenValue === loginToken) {
+        await redisClient.del(key);
+        deletedOtherSessions++;
+        console.log(`Удалена связанная сессия: ${key}`);
+      }
+    }
+    
+    res.json({
+      success: true,
+      sessionDeleted: deletedSession > 0,
+      userDeleted: !!userIdToDelete,
+      userIdDeleted: userIdToDelete,
+      otherSessionsDeleted: deletedOtherSessions,
+      message: 'Пользователь и сессии удалены из Redis'
+    });
+    
+  } catch (error) {
+    console.error('Ошибка при logout:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+app.post('/api/session/delete', async (req, res) => {
+  try {
+    const { sessionToken } = req.body;
+    
+    if (!sessionToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'sessionToken обязателен' 
+      });
+    }
+    
+    if (!redisClient || !redisClient.isOpen) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Redis недоступен' 
+      });
+    }
+    
+    const normalizedSessionToken = normalizeSessionToken(sessionToken);
+    
+    const sessionKey = `session:${normalizedSessionToken}`;
+    const deleted = await redisClient.del(sessionKey);
+    
+    const altDeleted = await redisClient.del(normalizedSessionToken);
+    
+    res.json({
+      success: true,
+      sessionDeleted: deleted > 0 || altDeleted > 0,
+      keysAttempted: [sessionKey, normalizedSessionToken],
+      message: 'Сессия удалена'
+    });
+    
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+app.get('/api/auth/check/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!redisClient || !redisClient.isOpen) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Redis недоступен' 
+      });
+    }
+    
+    const userKey = `user:${userId}`;
+    const userDataStr = await redisClient.get(userKey);
+    
+    if (!userDataStr) {
+      return res.json({
+        authenticated: false,
+        status: 'anonymous',
+        userId: userId,
+        message: 'Пользователь не найден'
+      });
+    }
+    
+    let userData;
+    try {
+      userData = JSON.parse(userDataStr);
+    } catch (e) {
+      return res.json({
+        authenticated: false,
+        status: 'anonymous',
+        userId: userId,
+        error: 'Ошибка обработки данных'
+      });
+    }
+    
+    const isAuthenticated = userData.status === 'authenticated' || userData.status === 'authorized';
+    
+    res.json({
+      authenticated: isAuthenticated,
+      status: userData.status || 'anonymous',
+      userId: userId,
+      provider: userData.provider,
+      loginToken: userData.login_token,
+      accessToken: userData.access_token,
+      refreshToken: userData.refresh_token,
+      created_at: userData.created_at,
+      last_active: userData.last_active,
+      ttl: await redisClient.ttl(userKey)
+    });
+    
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+app.post('/api/session/create', async (req, res) => {
+  try {
+    const { sessionToken, loginToken } = req.body;
+    
+    if (!sessionToken || !loginToken) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'sessionToken и loginToken обязательны' 
+      });
+    }
+    
+    const normalizedSessionToken = normalizeSessionToken(sessionToken);
+    
+    if (!redisClient || !redisClient.isOpen) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Redis недоступен' 
+      });
+    }
+    
+    const sessionKey = `session:${normalizedSessionToken}`;
+    
+    try {
+      await redisClient.setEx(sessionKey, 86400, loginToken);
+      
+      const savedValue = await redisClient.get(sessionKey);
+      if (savedValue === loginToken) {
+      }
+      
+    } catch (redisError) {
+      throw redisError;
+    }
+    
+    res.cookie('session_token', normalizedSessionToken, {
+      httpOnly: true,
+      secure: false,
+      maxAge: 24 * 60 * 60 * 1000,
+      sameSite: 'lax',
+      path: '/'
+    });
     
     res.json({
       success: true,
@@ -586,7 +767,6 @@ app.post('/api/session/create', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Ошибка при создании сессии:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -594,7 +774,6 @@ app.post('/api/session/create', async (req, res) => {
   }
 });
 
-// 📌 ПОЛУЧЕНИЕ ВСЕХ ПОЛЬЗОВАТЕЛЕЙ
 app.get('/api/users/all', async (req, res) => {
   try {
     if (!redisClient || !redisClient.isOpen) {
@@ -626,7 +805,6 @@ app.get('/api/users/all', async (req, res) => {
             ttl: await redisClient.ttl(key)
           });
         } catch (e) {
-          console.error('Ошибка парсинга данных пользователя:', e);
         }
       }
     }
@@ -645,7 +823,6 @@ app.get('/api/users/all', async (req, res) => {
   }
 });
 
-// 📌 Проверка Redis статуса
 app.get('/api/redis/status', async (req, res) => {
   try {
     if (!redisClient || !redisClient.isOpen) {
@@ -675,7 +852,6 @@ app.get('/api/redis/status', async (req, res) => {
   }
 });
 
-// 📌 Очистка всех данных (только для разработки)
 app.post('/api/redis/clear', async (req, res) => {
   try {
     if (!redisClient || !redisClient.isOpen) {
@@ -703,10 +879,6 @@ app.post('/api/redis/clear', async (req, res) => {
       await redisClient.del(userKeys);
     }
     
-    console.log('🧹 Очищены данные Redis:');
-    console.log('   Сессии:', sessionKeys.length);
-    console.log('   Пользователи:', userKeys.length);
-    
     res.json({
       success: true,
       cleared: {
@@ -717,7 +889,6 @@ app.post('/api/redis/clear', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Ошибка при очистке Redis:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -725,10 +896,8 @@ app.post('/api/redis/clear', async (req, res) => {
   }
 });
 
-// 📌 ГЕНЕРАЦИЯ USER ID (если не передан с фронтенда)
 app.get('/api/user/generate-id', async (req, res) => {
   try {
-    // Генерируем случайный ID пользователя
     const generateUserId = () => {
       const timestamp = Date.now();
       const random = Math.floor(Math.random() * 1000000);
@@ -737,8 +906,6 @@ app.get('/api/user/generate-id', async (req, res) => {
     
     const userId = generateUserId();
     
-    console.log('🆔 Сгенерирован новый User ID:', userId);
-    
     res.json({
       success: true,
       userId: userId,
@@ -746,7 +913,6 @@ app.get('/api/user/generate-id', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Ошибка при генерации User ID:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -754,34 +920,51 @@ app.get('/api/user/generate-id', async (req, res) => {
   }
 });
 
-// Запуск сервера
+// Добавьте в бэкенд
+app.post('/api/user/delete/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!redisClient || !redisClient.isOpen) {
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Redis недоступен' 
+      });
+    }
+    
+    const userKey = `user:${userId}`;
+    
+    // Удаляем пользователя
+    const deleted = await redisClient.del(userKey);
+    
+    // Ищем и удаляем все его сессии
+    const allSessionKeys = await redisClient.keys('session:*');
+    let deletedSessions = 0;
+    
+    for (const sessionKey of allSessionKeys) {
+      const loginToken = await redisClient.get(sessionKey);
+      // Если нужно, можно добавить дополнительную логику поиска
+      if (loginToken) {
+        // Просто удаляем все сессии для безопасности
+        await redisClient.del(sessionKey);
+        deletedSessions++;
+      }
+    }
+    
+    res.json({
+      success: true,
+      userDeleted: deleted > 0,
+      sessionsDeleted: deletedSessions,
+      message: `Пользователь ${userId} полностью удален`
+    });
+    
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log('════════════════════════════════════════');
-  console.log('🚀 Сервер запущен на порту', PORT);
-  console.log('📡 Адрес: http://localhost:' + PORT);
-  console.log('');
-  console.log('📋 СТРУКТУРА ХРАНЕНИЯ КАК У TELEGRAM БОТА:');
-  console.log('   Redis структура:');
-  console.log('     user:USER_ID -> {');
-  console.log('       "status": "anonymous" | "authenticated",');
-  console.log('       "login_token": "TOKEN",');
-  console.log('       "access_token": "TOKEN", // если авторизован');
-  console.log('       "refresh_token": "TOKEN", // если авторизован');
-  console.log('       "provider": "github" | "yandex" | "code",');
-  console.log('       "created_at": UNIX_TIMESTAMP,');
-  console.log('       "last_active": UNIX_TIMESTAMP');
-  console.log('     }');
-  console.log('');
-  console.log('🎯 ДОСТУПНЫЕ ЭНДПОИНТЫ:');
-  console.log('   POST   /api/user/create           - Создать пользователя');
-  console.log('   POST   /api/user/update-token     - Обновить токен пользователя');
-  console.log('   POST   /api/user/save-auth-tokens - Сохранить auth токены');
-  console.log('   GET    /api/user/:userId          - Получить данные пользователя');
-  console.log('   GET    /api/users/all             - Все пользователи');
-  console.log('   GET    /api/user/generate-id      - Сгенерировать User ID');
-  console.log('   GET    /api/session/check         - Проверить сессию (legacy)');
-  console.log('   POST   /api/session/create        - Создать сессию (legacy)');
-  console.log('   GET    /api/redis/status          - Статус Redis');
-  console.log('   POST   /api/redis/clear           - Очистка Redis (dev only)');
-  console.log('════════════════════════════════════════\n');
 });

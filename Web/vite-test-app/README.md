@@ -21,3 +21,5 @@ docker-compose logs -f
 
 redis-server  
 redis-cli 
+keys *
+FLUSHALL
