@@ -15,12 +15,8 @@ std::optional<User> MongoDB::find_user_by_email(const std::string& email) {
         User user;
         user.email = j["email"].get<std::string>();
         user.username = j["username"].get<std::string>();
-        
-        if (j.contains("refresh_tokens")) {
-            for (const auto& token : j["refresh_tokens"]) {
-                user.refresh_tokens.push_back(token.get<std::string>());
-            }
-        }
+        user.roles = {"Student"};
+        user.refresh_tokens = {};
         
         return user;
     }
@@ -29,7 +25,7 @@ std::optional<User> MongoDB::find_user_by_email(const std::string& email) {
 }
 
 bool MongoDB::create_user(const std::string& email, const std::string& username) {
-    json j = {{"email", email}, {"username", username}, {"roles", {"Student"}}};
+    json j = {{"email", email}, {"username", username}};
     auto res = client_.Post("/create_user", j.dump(), "application/json");
     
     return res && res->status == 200;

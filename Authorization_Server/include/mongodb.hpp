@@ -10,6 +10,7 @@ using json = nlohmann::json;
 struct User {
     std::string email;
     std::string username;
+    std::vector<std::string> roles;
     std::vector<std::string> refresh_tokens;
 };
 

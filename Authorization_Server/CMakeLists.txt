@@ -16,7 +16,6 @@ set(SOURCES
     src/oauth_yandex.cpp
     src/utils.cpp
     src/mongodb.cpp
-    src/oauth_code.cpp
 )
 
 add_executable(auth_server ${SOURCES})
