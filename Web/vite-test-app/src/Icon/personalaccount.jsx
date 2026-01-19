@@ -2102,42 +2102,7 @@ const completeTestAttempt = async (userId, attemptId, answers) => {
 };
 
 // Вспомогательная функция для генерации тестовых данных (если API не готово)
-const generateMockAnswers = () => {
-  const mockAnswers = [
-    {
-      question_id: 1,
-      question_text: "Что такое функция в программировании?",
-      user_answer: "Функция - это именованный блок кода, который выполняет определенную задачу и может быть вызван из других частей программы.",
-      is_correct: true,
-      correct_answer: "Функция - это именованный блок кода, который выполняет определенную задачу и может быть вызван из других частей программы.",
-      score: 1
-    },
-    {
-      question_id: 2,
-      question_text: "Что такое переменная?",
-      user_answer: "Переменная - это именованная ячейка памяти для хранения данных.",
-      is_correct: true,
-      correct_answer: "Переменная - это именованная ячейка памяти для хранения данных.",
-      score: 1
-    },
-    {
-      question_id: 3,
-      question_text: "Что такое массив?",
-      user_answer: "Коллекция элементов",
-      is_correct: false,
-      correct_answer: "Массив - это структура данных, содержащая набор элементов одного типа, доступных по индексу.",
-      score: 0
-    }
-  ];
-  
-  setUserAttemptDialog(prev => ({
-    ...prev,
-    answers: mockAnswers,
-    loading: false
-  }));
-  
-  return mockAnswers;
-};
+// 
 
 // 25. Проверить, является ли пользователь преподавателем на курсе
 const checkIsTeacherOnCourse = async (userId, disciplineId) => {
