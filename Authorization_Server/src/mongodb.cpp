@@ -16,7 +16,7 @@ std::optional<User> MongoDB::find_user(const std::string& email) {
         user.email = j["email"].get<std::string>();
         user.username = j["username"].get<std::string>();
 
-        user.roles = j.value("roles", std::vector<std::string>{"Student"});
+        user.roles = j.value("roles", std::vector<std::string>{"Студент"});
 
         user.access_tokens = j.value("access_tokens", std::vector<std::string>{});
         user.refresh_tokens = j.value("refresh_tokens", std::vector<std::string>{});

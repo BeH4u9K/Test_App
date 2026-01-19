@@ -1,3 +1,5 @@
 Telegram bot
 #запуск:
+cd Telegram
+cd tg_bot
 docker-compose up -d --build

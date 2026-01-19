@@ -14,7 +14,7 @@ bot = Bot(token=os.getenv("TELEGRAM_BOT_TOKEN"))
 dp = Dispatcher()
 
 async def forward_to_nginx(message: types.Message):
-    #Перенаправляет сообщение в Nginx -> Bot Logic
+    """Перенаправляет сообщение в Nginx -> Bot Logic"""
     try:
         async with aiohttp.ClientSession() as session:
             payload = {
@@ -38,7 +38,7 @@ async def forward_to_nginx(message: types.Message):
         await message.answer("Ошибка сервера, попробуйте позже")
 
 async def check_auth_status_all():
-    #ЦИКЛИЧЕСКИЙ ЗАПРОС: проверка статуса всех анонимных пользователей
+    """ЦИКЛИЧЕСКИЙ ЗАПРОС: проверка статуса всех анонимных пользователей"""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -67,9 +67,8 @@ async def check_auth_status_all():
     except Exception:
         return []
 
-
-#уведомлений всех авторизованных пользователей
 async def check_notifications_all():
+    """ЦИКЛИЧЕСКИЙ ЗАПРОС: проверка уведомлений всех авторизованных пользователей"""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(

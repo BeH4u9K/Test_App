@@ -23,6 +23,8 @@ void register_handlers(
 
     server.Get("/auth", [&](const Request& req, Response& res) {
         set_cors_headers(res);
+
+        std::cout << "Authorization starting..." << std::endl;
         
         std::string provider = req.get_param_value("provider");
         std::string login_token = req.get_param_value("login_token");
