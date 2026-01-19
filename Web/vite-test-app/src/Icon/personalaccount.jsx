@@ -3776,13 +3776,6 @@ const getBlockStatusComponent = (userId) => {
                   >
                     Редактировать ФИО
                   </Button>
-                  <Button
-    variant="outlined"
-    color="error"
-    onClick={() => (window.location.href = "/logout")}
-  >
-    Выход
-  </Button>
                 </Box>
               </Box>
               
@@ -5128,13 +5121,7 @@ const getBlockStatusComponent = (userId) => {
                 </Button>
               </Tooltip>
               <Tooltip title="Добавить существующий вопрос">
-                <Button
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={handleAddQuestionToTestClick}
-                >
-                  Добавить существующий вопрос
-                </Button>
+                
               </Tooltip>
               <IconButton onClick={handleCloseQuestionsDialog} size="small">
                 <CloseIcon />
@@ -5175,26 +5162,6 @@ const getBlockStatusComponent = (userId) => {
                     <Typography variant="body1">
                       <strong>Всего вопросов:</strong> {questionsDialog.questions.length}
                     </Typography>
-                   
-                      <Tooltip title="Изменить порядок вопросов">
-                        <Button
-                          variant="outlined"
-                          startIcon={<FormatListBulletedIcon />}
-                          onClick={handleReorderQuestionsClick}
-                        >
-                          Порядок вопросов
-                        </Button>
-                      </Tooltip>
-
-                      <Tooltip title="Просмотреть пользователей, прошедших тест">
-                        <Button
-                          variant="outlined"
-                          startIcon={<PeopleIcon />}
-                          onClick={handleViewTestUsersClick}
-                        >
-                          Результаты теста
-                        </Button>
-                      </Tooltip>
                   </Grid>
                 </Grid>
               </Box>
@@ -5251,12 +5218,7 @@ const getBlockStatusComponent = (userId) => {
                                 Подробнее
                               </Button>
                               <Tooltip title="Дополнительные действия">
-                                <IconButton
-                                  size="small"
-                                  onClick={(event) => handleQuestionMenuOpen(event, question)}
-                                >
-                                  <MoreVertIcon />
-                                </IconButton>
+                  
                               </Tooltip>
                             </Box>
                           </TableCell>
