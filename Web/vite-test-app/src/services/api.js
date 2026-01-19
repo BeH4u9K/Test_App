@@ -1,10 +1,10 @@
-// src/services/api.js
-const API_BASE_URL = 'http://localhost:3001'; // Node.js сервер
 
-// Функция отправки токена на сервер
+const API_BASE_URL = 'http://localhost:3001';
+
+
 export const sendTokenToServer = async (loginToken) => {
   try {
-    console.log('📤 Отправка токена на сервер...');
+    console.log(' Отправка токена на сервер...');
     
     const response = await fetch(`${API_BASE_URL}/api/save-token`, {
       method: 'POST',
@@ -23,7 +23,7 @@ export const sendTokenToServer = async (loginToken) => {
     }
 
     const result = await response.json();
-    console.log('✅ Ответ сервера:', result);
+    console.log('Ответ сервера:', result);
     
     return {
       success: true,
@@ -31,7 +31,7 @@ export const sendTokenToServer = async (loginToken) => {
       message: result.message
     };
   } catch (error) {
-    console.error('❌ Ошибка отправки токена:', error);
+    console.error(' Ошибка отправки токена:', error);
     return {
       success: false,
       error: error.message
@@ -39,12 +39,11 @@ export const sendTokenToServer = async (loginToken) => {
   }
 };
 
-// Создание сессии (отправляет токен на сервер)
+
 export const createSession = async (loginToken) => {
   return await sendTokenToServer(loginToken);
 };
 
-// Тест подключения к Node.js серверу
 export const testConnection = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/health`, {
@@ -60,7 +59,7 @@ export const testConnection = async () => {
       data
     };
   } catch (error) {
-    console.error('❌ Ошибка подключения к серверу:', error);
+    console.error(' Ошибка подключения к серверу:', error);
     return {
       success: false,
       error: error.message
@@ -68,7 +67,7 @@ export const testConnection = async () => {
   }
 };
 
-// Тест Redis через сервер
+
 export const testRedis = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/redis-test`, {
@@ -84,7 +83,7 @@ export const testRedis = async () => {
       data
     };
   } catch (error) {
-    console.error('❌ Ошибка теста Redis:', error);
+    console.error(' Ошибка теста Redis:', error);
     return {
       success: false,
       error: error.message
@@ -92,7 +91,7 @@ export const testRedis = async () => {
   }
 };
 
-// Генерация токена (остается на клиенте)
+
 export const generateToken = (length = 32) => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -102,7 +101,6 @@ export const generateToken = (length = 32) => {
   return result;
 };
 
-// Работа с куками (остается на клиенте)
 export const setCookie = (name, value, days) => {
   const expires = new Date();
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
@@ -124,7 +122,7 @@ export const deleteCookie = (name) => {
   document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
 };
 
-// Проверка валидности провайдера
+
 export const isValidProvider = (provider) => {
   return ['github', 'code', 'yandex'].includes(provider);
 };
